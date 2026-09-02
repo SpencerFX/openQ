@@ -1,0 +1,24 @@
+{
+  "procType": "cep",
+  "name": "massive_cep",
+  "port": 5049,
+  "schema": "../schemas/schema_efx.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "tp.q",
+    "cep.q"
+  ],
+  "params": {
+    "srcaddr": ":localhost:5045",
+    "cepscript": "../modules/ingest/massive/cep.q",
+    "tplogdir": "",
+    "bmode": 0
+  }
+}

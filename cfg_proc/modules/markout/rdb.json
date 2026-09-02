@@ -1,0 +1,26 @@
+{
+  "procType": "rdb",
+  "name": "markout_rdb",
+  "schema": "../schemas/schema_markout.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "rdb.q",
+    "utils/gateway.q",
+    "query.q",
+    "save.q"
+  ],
+  "params": {
+    "tpaddr": ":localhost:5034",
+    "hdbroot": "../examples/data/markout/hdb",
+    "port1": 5031,
+    "port2": 5102,
+    "instance": 1
+  }
+}

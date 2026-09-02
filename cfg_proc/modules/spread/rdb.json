@@ -1,0 +1,26 @@
+{
+  "procType": "rdb",
+  "name": "spread_rdb",
+  "schema": "../schemas/schema_spread.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "rdb.q",
+    "utils/gateway.q",
+    "query.q",
+    "save.q"
+  ],
+  "params": {
+    "tpaddr": ":localhost:5059",
+    "hdbroot": "../examples/data/spread/hdb",
+    "port1": 5056,
+    "port2": 5103,
+    "instance": 1
+  }
+}

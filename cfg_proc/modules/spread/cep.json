@@ -1,0 +1,24 @@
+{
+  "procType": "cep",
+  "name": "spread_cep",
+  "port": 5059,
+  "schema": "../schemas/schema_spread.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "tp.q",
+    "cep.q"
+  ],
+  "params": {
+    "srcaddr": ":localhost:5055",
+    "cepscript": "../modules/analytics/spread/cep.q",
+    "tplogdir": "",
+    "bmode": 0
+  }
+}

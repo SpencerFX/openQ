@@ -1,0 +1,22 @@
+{
+  "procType": "tp",
+  "name": "mon_tp",
+  "port": 5020,
+  "schema": "../schemas/schema_mon.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "tp.q",
+    "../modules/utils/generator/generator.q"
+  ],
+  "params": {
+    "tplogdir": "../examples/data/mon/tplogs",
+    "bmode": 0
+  }
+}

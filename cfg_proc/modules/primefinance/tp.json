@@ -1,0 +1,21 @@
+{
+  "procType": "tp",
+  "name": "primefinance_tp",
+  "port": 5070,
+  "schema": "../schemas/schema_primefinance.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "tp.q"
+  ],
+  "params": {
+    "tplogdir": "../examples/data/primefinance/tplogs",
+    "bmode": 0
+  }
+}

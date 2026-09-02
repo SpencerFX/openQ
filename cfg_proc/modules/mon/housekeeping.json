@@ -1,0 +1,23 @@
+{
+  "procType": "housekeeping",
+  "name": "mon_housekeeping",
+  "port": 5026,
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "housekeeping.q"
+  ],
+  "params": {
+    "hkscript": "../modules/mon/eod_housekeeping.q",
+    "hkfreq": "0D00:01:00",
+    "idbaddr": ":localhost:5022",
+    "hdbroot": "C:/data/db1/mon",
+    "eodTriggerTime": "00:00:00.000"
+  }
+}

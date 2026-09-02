@@ -1,0 +1,25 @@
+{
+  "procType": "idb",
+  "name": "massive_idb",
+  "port": 5047,
+  "schema": "../schemas/schema_efx.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "save.q",
+    "idb.q"
+  ],
+  "params": {
+    "rdbaddr": ":localhost:5046",
+    "rdbaddr2": ":localhost:5105",
+    "idbroot": "../examples/data/massive/idb_staging",
+    "hdbroot": "../examples/data/massive/hdb",
+    "checkpointfreq": "0D00:02:00"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "procType": "rdb",
+  "name": "rdb0",
+  "schema": "../schemas/schema.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "rdb.q",
+    "utils/gateway.q",
+    "query.q",
+    "save.q"
+  ],
+  "params": {
+    "tpaddr": ":localhost:5010",
+    "hdbroot": "../examples/data/hdb",
+    "port1": 5011,
+    "port2": 5100,
+    "instance": 1
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "procType": "idb",
+  "name": "spread_idb",
+  "port": 5057,
+  "schema": "../schemas/schema_spread.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "save.q",
+    "idb.q"
+  ],
+  "params": {
+    "rdbaddr": ":localhost:5056",
+    "rdbaddr2": ":localhost:5103",
+    "idbroot": "../examples/data/spread/idb_staging",
+    "hdbroot": "../examples/data/spread/hdb",
+    "checkpointfreq": "0D00:02:00"
+  }
+}

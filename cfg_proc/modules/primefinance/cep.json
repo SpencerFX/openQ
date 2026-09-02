@@ -1,0 +1,25 @@
+{
+  "procType": "cep",
+  "name": "primefinance_cep",
+  "port": 5074,
+  "schema": "../schemas/schema_primefinance.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "tp.q",
+    "cep.q"
+  ],
+  "params": {
+    "srcaddr": ":localhost:5070",
+    "cepscript": "../modules/analytics/primeFinance/cep.q",
+    "tplogdir": "",
+    "bmode": 0,
+    "eqhdbaddr": ":localhost:5090"
+  }
+}

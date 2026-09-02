@@ -1,0 +1,21 @@
+{
+  "procType": "fh",
+  "name": "massive_fh",
+  "port": 5018,
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "fh.q"
+  ],
+  "params": {
+    "tpaddr": ":localhost:5045",
+    "fhscript": "../modules/ingest/massive/fh.q",
+    "apikey": ""
+  }
+}

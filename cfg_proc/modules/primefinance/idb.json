@@ -1,0 +1,25 @@
+{
+  "procType": "idb",
+  "name": "primefinance_idb",
+  "port": 5072,
+  "schema": "../schemas/schema_primefinance.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "save.q",
+    "idb.q"
+  ],
+  "params": {
+    "rdbaddr": ":localhost:5071",
+    "rdbaddr2": ":localhost:5104",
+    "idbroot": "../examples/data/primefinance/idb_staging",
+    "hdbroot": "../examples/data/primefinance/hdb",
+    "checkpointfreq": "0D00:02:00"
+  }
+}

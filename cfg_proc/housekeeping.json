@@ -1,0 +1,20 @@
+{
+  "procType": "housekeeping",
+  "name": "hk0",
+  "port": 5016,
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "housekeeping.q"
+  ],
+  "params": {
+    "hkscript": "",
+    "hkfreq": "0D00:01:00"
+  }
+}

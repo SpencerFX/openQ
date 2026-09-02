@@ -1,0 +1,25 @@
+{
+  "procType": "idb",
+  "name": "markout_idb",
+  "port": 5032,
+  "schema": "../schemas/schema_markout.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "save.q",
+    "idb.q"
+  ],
+  "params": {
+    "rdbaddr": ":localhost:5031",
+    "rdbaddr2": ":localhost:5102",
+    "idbroot": "../examples/data/markout/idb_staging",
+    "hdbroot": "../examples/data/markout/hdb",
+    "checkpointfreq": "0D00:02:00"
+  }
+}

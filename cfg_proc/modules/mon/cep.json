@@ -1,0 +1,24 @@
+{
+  "procType": "cep",
+  "name": "mon_cep",
+  "port": 5024,
+  "schema": "../schemas/schema_mon.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "tp.q",
+    "cep.q"
+  ],
+  "params": {
+    "srcaddr": ":localhost:5020",
+    "cepscript": "../modules/mon/cep.q",
+    "tplogdir": "",
+    "bmode": 0
+  }
+}
