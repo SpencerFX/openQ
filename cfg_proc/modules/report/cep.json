@@ -1,0 +1,24 @@
+{
+  "procType": "cep",
+  "name": "report_cep",
+  "port": 5080,
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "tp.q",
+    "save.q",
+    "cep.q"
+  ],
+  "params": {
+    "srcaddr": ":localhost:5074",
+    "cepscript": "../modules/analytics/report/cep.q",
+    "tplogdir": "",
+    "bmode": 0
+  }
+}

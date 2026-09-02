@@ -1,0 +1,23 @@
+{
+  "procType": "eod",
+  "name": "markout_eod",
+  "port": 5067,
+  "schema": "../schemas/schema_markout.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "save.q",
+    "eod.q"
+  ],
+  "params": {
+    "idbroot": "../examples/data/markout/idb_staging",
+    "hdbroot": "../examples/data/markout/hdb",
+    "eodDate": ""
+  }
+}

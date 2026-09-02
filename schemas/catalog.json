@@ -1,0 +1,448 @@
+{
+  "_about": "Data catalog for openQ's table schemas: one entry per (schema, table) with a plain-English description of the table and every column, plus its kdb+ type. Curated alongside schemas/*.q and core/housekeeping.q; keep in sync when a schema column changes. Consumed by openDash/gateway (/api/catalog -> the dashboard's Data > Catalog page).",
+  "types": {
+    "p": "timestamp",
+    "s": "symbol",
+    "j": "long",
+    "i": "int",
+    "f": "float",
+    "d": "date",
+    "b": "boolean",
+    "C": "string",
+    "*": "list"
+  },
+  "groups": [
+    { "name": "HDB-eFX", "tier": "hdb", "desc": "On-disk historical FX archive (schema_efx.q; C:/data/db1/efx)." },
+    { "name": "HDB-eq", "tier": "hdb", "desc": "On-disk equities market data from the real Yahoo Finance ingest pipeline (schema_eq.q; C:/data/db1/eq)." },
+    { "name": "HDB-mon", "tier": "hdb", "desc": "On-disk monitoring archive (schema_mon.q + core/housekeeping.q; C:/data/db1/mon)." },
+    { "name": "In-Memory Markout", "tier": "memory", "desc": "Live markout module ingest (schema_markout.q) — analysed in the RDB/CEP, HDB mostly empty." },
+    { "name": "In-Memory PrimeFinance", "tier": "memory", "desc": "Live securities-finance state (schema_primefinance.q)." },
+    { "name": "In-Memory Spread", "tier": "memory", "desc": "Live spread build-up quotes (schema_spread.q)." },
+    { "name": "Demo-eq", "tier": "demo", "desc": "Example tables shipped with openQ — the generic default pipeline (schema.q), not a real production dataset." }
+  ],
+  "tables": [
+    {
+      "name": "quote",
+      "schema": "schema.q",
+      "pipeline": "default",
+      "group": "Demo-eq",
+      "key": ["timestamp", "sym"],
+      "desc": "Generic top-of-book quote — one row per market-data update on the default demo pipeline. Every openQ table leads with timestamp,sym (enforced by tp.q's .u.tick).",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Tickerplant receipt time (UTC). Mandatory first column; drives per-sym partitioning, replay and grouped/parted attributes." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Instrument symbol. Mandatory second column." },
+        { "name": "bid", "kdb": "f", "type": "float", "desc": "Best bid price." },
+        { "name": "ask", "kdb": "f", "type": "float", "desc": "Best ask (offer) price." },
+        { "name": "bidSize", "kdb": "f", "type": "float", "desc": "Size available at the best bid." },
+        { "name": "askSize", "kdb": "f", "type": "float", "desc": "Size available at the best ask." },
+        { "name": "source", "kdb": "s", "type": "symbol", "desc": "Feed / venue the quote came from." }
+      ]
+    },
+    {
+      "name": "trade",
+      "schema": "schema.q",
+      "pipeline": "default",
+      "group": "Demo-eq",
+      "key": ["timestamp", "sym"],
+      "desc": "Generic trade print on the default demo pipeline — one row per execution.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Tickerplant receipt time (UTC)." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Instrument symbol." },
+        { "name": "price", "kdb": "f", "type": "float", "desc": "Trade price." },
+        { "name": "size", "kdb": "f", "type": "float", "desc": "Trade quantity." },
+        { "name": "side", "kdb": "s", "type": "symbol", "desc": "Aggressor side — `buy / `sell (where the feed reports it)." },
+        { "name": "source", "kdb": "s", "type": "symbol", "desc": "Feed / venue the print came from." }
+      ]
+    },
+
+    {
+      "name": "trade",
+      "schema": "schema_markout.q",
+      "pipeline": "markout",
+      "group": "In-Memory Markout",
+      "key": ["timestamp", "sym"],
+      "desc": "Trade stream feeding the markout module's modules/analytics/markout/markOutImpact.q. timestamp -> tradeTime, price -> tradeRate in the library.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Trade time (UTC); the library's tradeTime." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Instrument symbol (currency pair)." },
+        { "name": "tradeID", "kdb": "j", "type": "long", "desc": "Unique trade identifier, used to correlate a fill with its later markout samples." },
+        { "name": "price", "kdb": "f", "type": "float", "desc": "Executed rate; the library's tradeRate." }
+      ]
+    },
+    {
+      "name": "order",
+      "schema": "schema_markout.q",
+      "pipeline": "markout",
+      "group": "In-Memory Markout",
+      "key": ["timestamp", "sym"],
+      "desc": "Order stream feeding the markout module. timestamp -> orderTime, price -> orderRate; drives .impact.onBook's arrival-price capture.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Order time (UTC); the library's orderTime." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Instrument symbol." },
+        { "name": "orderID", "kdb": "j", "type": "long", "desc": "Unique order identifier; keys the pending-impact state until the order's decay window closes." },
+        { "name": "price", "kdb": "f", "type": "float", "desc": "Order (limit / arrival) rate; the library's orderRate." },
+        { "name": "side", "kdb": "s", "type": "symbol", "desc": "Order side — `buy / `sell; sets the sign of the impact measure." }
+      ]
+    },
+    {
+      "name": "rate",
+      "schema": "schema_markout.q",
+      "pipeline": "markout",
+      "group": "In-Memory Markout",
+      "key": ["timestamp", "sym"],
+      "desc": "Reference mid-rate feed. Both .markout.onRate and .impact.onBook match trades / orders against this series; also the price source for the dashboard's eFX > Charts (OHLC).",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Quote time (UTC); the library's time." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Instrument symbol." },
+        { "name": "mid", "kdb": "f", "type": "float", "desc": "Mid rate at that instant — the benchmark markout and impact are measured relative to." }
+      ]
+    },
+
+    {
+      "name": "spreadQuote",
+      "schema": "schema_spread.q",
+      "pipeline": "spread",
+      "group": "In-Memory Spread",
+      "key": ["timestamp", "sym"],
+      "desc": "One row per priced quote, already decomposed by the pricing engine into its seven named build-up components (matches modules/analytics/spread/spread.q's .spread.quote). Component values are price fractions; the dashboard reports them in bps (x1e4).",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Quote time (UTC)." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Instrument symbol." },
+        { "name": "aggression", "kdb": "s", "type": "symbol", "desc": "Client aggression bucket — `low / `medium / `high; a regime dimension for by-regime aggregation." },
+        { "name": "marketStatus", "kdb": "s", "type": "symbol", "desc": "Market regime — `normal / `stressed; the other regime dimension." },
+        { "name": "weight", "kdb": "f", "type": "float", "desc": "Row weight for the engine's weighted averages (typically notional or a confidence weight)." },
+        { "name": "refSprd", "kdb": "f", "type": "float", "desc": "Reference spread — the raw market spread the quote starts from." },
+        { "name": "baseSprd", "kdb": "f", "type": "float", "desc": "Base house spread added on top of the reference." },
+        { "name": "clientSprd", "kdb": "f", "type": "float", "desc": "Client-tier adjustment (tighter or wider by relationship / flow quality)." },
+        { "name": "volSprd", "kdb": "f", "type": "float", "desc": "Volatility widening component." },
+        { "name": "smoothSprd", "kdb": "f", "type": "float", "desc": "Smoothing / hysteresis term that damps quote-to-quote jitter." },
+        { "name": "fallbackSprd", "kdb": "f", "type": "float", "desc": "Fallback widening applied when a primary input is stale or missing." },
+        { "name": "alphaSprd", "kdb": "f", "type": "float", "desc": "Alpha / skew term from the engine's short-term directional signal." }
+      ]
+    },
+
+    {
+      "name": "inventory",
+      "schema": "schema_primefinance.q",
+      "pipeline": "primefinance",
+      "group": "In-Memory PrimeFinance",
+      "key": ["timestamp", "sym"],
+      "desc": "Borrowable-supply snapshots per (symbol, lender) for the securities-finance / prime module.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Snapshot time (UTC)." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Security symbol." },
+        { "name": "lender", "kdb": "s", "type": "symbol", "desc": "Lending counterparty / desk offering the supply." },
+        { "name": "available", "kdb": "j", "type": "long", "desc": "Quantity currently available to borrow from this lender." },
+        { "name": "feeBp", "kdb": "f", "type": "float", "desc": "Indicative borrow fee, annualised basis points." },
+        { "name": "termDays", "kdb": "i", "type": "int", "desc": "Offered term length in days (0 = open / overnight)." },
+        { "name": "recallRisk", "kdb": "f", "type": "float", "desc": "Probability-style score (0-1) that this supply gets recalled early." },
+        { "name": "counterpartyRisk", "kdb": "f", "type": "float", "desc": "Credit / concentration risk score (0-1) for the lender." },
+        { "name": "minLot", "kdb": "j", "type": "long", "desc": "Minimum borrow size the lender will transact." }
+      ]
+    },
+    {
+      "name": "locate",
+      "schema": "schema_primefinance.q",
+      "pipeline": "primefinance",
+      "group": "In-Memory PrimeFinance",
+      "key": ["timestamp", "sym"],
+      "desc": "Locate requests and their allocation status — the demand side of coverage.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Request time (UTC)." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Security symbol." },
+        { "name": "locateID", "kdb": "j", "type": "long", "desc": "Unique locate identifier." },
+        { "name": "client", "kdb": "s", "type": "symbol", "desc": "Requesting client / fund." },
+        { "name": "requested", "kdb": "j", "type": "long", "desc": "Quantity the client asked to locate." },
+        { "name": "allocated", "kdb": "j", "type": "long", "desc": "Quantity actually granted (<= requested)." },
+        { "name": "expiry", "kdb": "p", "type": "timestamp", "desc": "When the locate reservation lapses if unused." },
+        { "name": "priority", "kdb": "i", "type": "int", "desc": "Allocation priority (lower = filled first)." },
+        { "name": "status", "kdb": "s", "type": "symbol", "desc": "Lifecycle state — e.g. `open / `filled / `partial / `expired / `cancelled." }
+      ]
+    },
+    {
+      "name": "position",
+      "schema": "schema_primefinance.q",
+      "pipeline": "primefinance",
+      "group": "In-Memory PrimeFinance",
+      "key": ["timestamp", "sym"],
+      "desc": "Client short positions that create the borrow requirement.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "As-of time (UTC)." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Security symbol." },
+        { "name": "client", "kdb": "s", "type": "symbol", "desc": "Position holder." },
+        { "name": "qty", "kdb": "j", "type": "long", "desc": "Signed position quantity (negative = short — the side that needs coverage)." },
+        { "name": "avgPx", "kdb": "f", "type": "float", "desc": "Average price of the position." }
+      ]
+    },
+    {
+      "name": "borrow",
+      "schema": "schema_primefinance.q",
+      "pipeline": "primefinance",
+      "group": "In-Memory PrimeFinance",
+      "key": ["timestamp", "sym"],
+      "desc": "Open stock-borrow contracts covering short positions.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Contract / booking time (UTC)." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Security symbol." },
+        { "name": "client", "kdb": "s", "type": "symbol", "desc": "Borrowing client." },
+        { "name": "lender", "kdb": "s", "type": "symbol", "desc": "Lending counterparty." },
+        { "name": "qty", "kdb": "j", "type": "long", "desc": "Borrowed quantity." },
+        { "name": "feeBp", "kdb": "f", "type": "float", "desc": "Contracted borrow fee, annualised basis points." },
+        { "name": "expiry", "kdb": "p", "type": "timestamp", "desc": "Contract maturity / next roll date." }
+      ]
+    },
+    {
+      "name": "recall",
+      "schema": "schema_primefinance.q",
+      "pipeline": "primefinance",
+      "group": "In-Memory PrimeFinance",
+      "key": ["timestamp", "sym"],
+      "desc": "Recall notices from lenders — supply being pulled back, which can force a buy-in.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Notice time (UTC)." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Security symbol." },
+        { "name": "lender", "kdb": "s", "type": "symbol", "desc": "Lender issuing the recall." },
+        { "name": "qty", "kdb": "j", "type": "long", "desc": "Quantity being recalled." },
+        { "name": "severity", "kdb": "s", "type": "symbol", "desc": "Urgency band — e.g. `low / `medium / `high." },
+        { "name": "due", "kdb": "p", "type": "timestamp", "desc": "Deadline to return the stock before a buy-in is triggered." }
+      ]
+    },
+
+    {
+      "name": "logs",
+      "schema": "schema_mon.q",
+      "pipeline": "mon",
+      "group": "HDB-mon",
+      "key": ["timestamp", "sym"],
+      "desc": "Central log table: every process that loads core/utils/logToTab.q and connects to the mon tickerplant publishes one row per log line here, with a full banner so it can be queried like a merged log file across the estate.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Mon tickerplant receipt time (UTC)." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Publishing process's -name (blank if unknown)." },
+        { "name": "level", "kdb": "s", "type": "symbol", "desc": "Severity — `FATAL / `ERROR / `WARN / `INFO / `DEBUG." },
+        { "name": "host", "kdb": "s", "type": "symbol", "desc": "Hostname the process runs on (.z.h)." },
+        { "name": "pid", "kdb": "i", "type": "int", "desc": "OS process id (.z.i)." },
+        { "name": "handle", "kdb": "i", "type": "int", "desc": "IPC handle the row was published on (.z.w)." },
+        { "name": "user", "kdb": "s", "type": "symbol", "desc": "OS user the process runs as (.z.u)." },
+        { "name": "mem", "kdb": "j", "type": "long", "desc": "Process heap used at log time, MB (.Q.w[]`used)." },
+        { "name": "code", "kdb": "s", "type": "symbol", "desc": "Caller-supplied event code (e.g. `.report.refresh) — a stable key for filtering." },
+        { "name": "message", "kdb": "C", "type": "string", "desc": "The log message text." }
+      ]
+    },
+    {
+      "name": "pidstats",
+      "schema": "schema_mon.q",
+      "pipeline": "mon",
+      "group": "HDB-mon",
+      "key": ["timestamp", "sym"],
+      "desc": "One row per (host, pid) per poll from modules/mon/pidstat_poller.py (or the Node stand-in), combining `pidstat -u` (CPU) and `pidstat -r` (memory).",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Mon tickerplant receipt time (UTC)." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Monitored openQ process's -name; blank for a non-openQ process on the host." },
+        { "name": "pidstatTime", "kdb": "p", "type": "timestamp", "desc": "pidstat's own sample timestamp — when the metrics were measured, vs `timestamp which is when the TP received them." },
+        { "name": "host", "kdb": "s", "type": "symbol", "desc": "Hostname." },
+        { "name": "pid", "kdb": "i", "type": "int", "desc": "OS process id." },
+        { "name": "uid", "kdb": "i", "type": "int", "desc": "OS user id owning the process." },
+        { "name": "procType", "kdb": "s", "type": "symbol", "desc": "openQ role (tp/rdb/hdb/gw/cep/idb...) — populated only when the command line carries -procType; null for initFromCfg.q launches." },
+        { "name": "port", "kdb": "i", "type": "int", "desc": "openQ listen port — populated only when the command line carries -port; null otherwise." },
+        { "name": "userPct", "kdb": "f", "type": "float", "desc": "% CPU in user space over the interval." },
+        { "name": "sysPct", "kdb": "f", "type": "float", "desc": "% CPU in kernel space." },
+        { "name": "guestPct", "kdb": "f", "type": "float", "desc": "% CPU running a guest VM (usually 0)." },
+        { "name": "waitPct", "kdb": "f", "type": "float", "desc": "% CPU time stalled waiting (pidstat %wait)." },
+        { "name": "cpuPct", "kdb": "f", "type": "float", "desc": "Total % of one core used (user + sys + guest)." },
+        { "name": "cpuId", "kdb": "i", "type": "int", "desc": "Which logical CPU the process last ran on." },
+        { "name": "minflt", "kdb": "f", "type": "float", "desc": "Minor page faults per second." },
+        { "name": "majflt", "kdb": "f", "type": "float", "desc": "Major page faults per second (disk-backed)." },
+        { "name": "vsz", "kdb": "j", "type": "long", "desc": "Virtual memory size, KB." },
+        { "name": "rss", "kdb": "j", "type": "long", "desc": "Resident set size, KB — real physical memory." },
+        { "name": "memPct", "kdb": "f", "type": "float", "desc": "RSS as % of total machine RAM." },
+        { "name": "threads", "kdb": "i", "type": "int", "desc": "Thread count." },
+        { "name": "fdnr", "kdb": "i", "type": "int", "desc": "Open file-descriptor count." },
+        { "name": "command", "kdb": "C", "type": "string", "desc": "Full raw command line — always the complete picture even when procType/port couldn't be parsed." }
+      ]
+    },
+    {
+      "name": "tableHealth",
+      "schema": "core/housekeeping.q",
+      "pipeline": "mon",
+      "group": "HDB-mon",
+      "key": ["tab", "date"],
+      "desc": "Output of examples/scripts/05_table_health_scan.q (.oq.hk.scanHDB) for the BAR-level tables of an on-disk HDB: one row per (table, date) scanned, with that table's whole-history summary repeated on every row. Persisted under -monroot; backs the dashboard's HDB Health page.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "When this scan ran." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Caller-supplied identifier for the scanned HDB / deployment (-name)." },
+        { "name": "tab", "kdb": "s", "type": "symbol", "desc": "Name of the table this row describes." },
+        { "name": "role", "kdb": "s", "type": "symbol", "desc": "Always `hdb — this scan only ever reads on-disk history." },
+        { "name": "date", "kdb": "d", "type": "date", "desc": "The partition date this row describes." },
+        { "name": "rowCountToday", "kdb": "j", "type": "long", "desc": "Exact row count in this date's partition." },
+        { "name": "rowCountTotal", "kdb": "j", "type": "long", "desc": "Exact row count across every partition the table has — repeated on each of its date rows." },
+        { "name": "firstTime", "kdb": "p", "type": "timestamp", "desc": "Earliest row timestamp in this date's partition." },
+        { "name": "lastTime", "kdb": "p", "type": "timestamp", "desc": "Latest row timestamp in this date's partition." },
+        { "name": "ageSec", "kdb": "f", "type": "float", "desc": "now - lastTime in seconds — a staleness signal for the newest partition." },
+        { "name": "bytesMem", "kdb": "j", "type": "long", "desc": "Always null here — in-memory footprint only applies to a live rdb/cep." },
+        { "name": "bytesDisk", "kdb": "j", "type": "long", "desc": "On-disk bytes of this (table, date) partition directory." },
+        { "name": "partitionCnt", "kdb": "i", "type": "int", "desc": "How many dates the table has any partition for, across its whole history — repeated per row." },
+        { "name": "oldestDate", "kdb": "d", "type": "date", "desc": "Earliest partition date in the table's history — repeated per row." },
+        { "name": "newestDate", "kdb": "d", "type": "date", "desc": "Latest partition date in the table's history — repeated per row." },
+        { "name": "status", "kdb": "s", "type": "symbol", "desc": "`HEALTHY (this date has rows) or `EMPTY (no partition, or an empty one)." }
+      ]
+    },
+    {
+      "name": "tableHealthTick",
+      "schema": "core/housekeeping.q",
+      "pipeline": "mon",
+      "group": "HDB-mon",
+      "key": ["tab", "date"],
+      "desc": "Identical shape to tableHealth, produced by a separate scan pass over the TICK-level tables (higher volume) so the two land as distinct tables side by side under one -monroot.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "When this scan ran." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Caller-supplied identifier for the scanned HDB / deployment." },
+        { "name": "tab", "kdb": "s", "type": "symbol", "desc": "Name of the tick-level table this row describes." },
+        { "name": "role", "kdb": "s", "type": "symbol", "desc": "Always `hdb." },
+        { "name": "date", "kdb": "d", "type": "date", "desc": "The partition date this row describes." },
+        { "name": "rowCountToday", "kdb": "j", "type": "long", "desc": "Exact row count in this date's partition." },
+        { "name": "rowCountTotal", "kdb": "j", "type": "long", "desc": "Exact row count across every partition — repeated per row." },
+        { "name": "firstTime", "kdb": "p", "type": "timestamp", "desc": "Earliest row timestamp in this partition." },
+        { "name": "lastTime", "kdb": "p", "type": "timestamp", "desc": "Latest row timestamp in this partition." },
+        { "name": "ageSec", "kdb": "f", "type": "float", "desc": "now - lastTime in seconds." },
+        { "name": "bytesMem", "kdb": "j", "type": "long", "desc": "Always null here." },
+        { "name": "bytesDisk", "kdb": "j", "type": "long", "desc": "On-disk bytes of this (table, date) partition." },
+        { "name": "partitionCnt", "kdb": "i", "type": "int", "desc": "Count of dates the table has any partition for — repeated per row." },
+        { "name": "oldestDate", "kdb": "d", "type": "date", "desc": "Earliest partition date — repeated per row." },
+        { "name": "newestDate", "kdb": "d", "type": "date", "desc": "Latest partition date — repeated per row." },
+        { "name": "status", "kdb": "s", "type": "symbol", "desc": "`HEALTHY or `EMPTY." }
+      ]
+    },
+
+    {
+      "name": "fx_tick_massive",
+      "schema": "schema_efx.q",
+      "pipeline": "efx (external HDB)",
+      "group": "HDB-eFX",
+      "key": ["timestamp", "sym"],
+      "desc": "Tick-level FX quotes from the 'massive' vendor feed in an existing on-disk archive (C:/data/db1/efx). Read-only integration — openQ never writes here.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Quote time (UTC)." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Currency pair." },
+        { "name": "ask", "kdb": "f", "type": "float", "desc": "Ask price." },
+        { "name": "bid", "kdb": "f", "type": "float", "desc": "Bid price." },
+        { "name": "ask_exchange", "kdb": "j", "type": "long", "desc": "Numeric venue id for the ask side." },
+        { "name": "bid_exchange", "kdb": "j", "type": "long", "desc": "Numeric venue id for the bid side." }
+      ]
+    },
+    {
+      "name": "fx_tick_dukasCopy",
+      "schema": "schema_efx.q",
+      "pipeline": "efx (external HDB)",
+      "group": "HDB-eFX",
+      "key": ["timestamp", "sym"],
+      "desc": "Tick-level FX quotes from the 'dukasCopy' vendor feed, which also carries per-side volume and string venue codes.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Quote time (UTC)." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Currency pair." },
+        { "name": "ask", "kdb": "f", "type": "float", "desc": "Ask price." },
+        { "name": "bid", "kdb": "f", "type": "float", "desc": "Bid price." },
+        { "name": "ask_volume", "kdb": "f", "type": "float", "desc": "Volume quoted at the ask." },
+        { "name": "bid_volume", "kdb": "f", "type": "float", "desc": "Volume quoted at the bid." },
+        { "name": "ask_exchange", "kdb": "s", "type": "symbol", "desc": "Venue code for the ask side." },
+        { "name": "bid_exchange", "kdb": "s", "type": "symbol", "desc": "Venue code for the bid side." }
+      ]
+    },
+    {
+      "name": "fx_m1_massive",
+      "schema": "schema_efx.q",
+      "pipeline": "efx (external HDB)",
+      "group": "HDB-eFX",
+      "key": ["timestamp", "sym"],
+      "desc": "1-minute OHLC bars from the 'massive' vendor feed.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Bar start time (UTC)." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Currency pair." },
+        { "name": "open", "kdb": "f", "type": "float", "desc": "Open price of the minute." },
+        { "name": "high", "kdb": "f", "type": "float", "desc": "High price of the minute." },
+        { "name": "low", "kdb": "f", "type": "float", "desc": "Low price of the minute." },
+        { "name": "close", "kdb": "f", "type": "float", "desc": "Close price of the minute." },
+        { "name": "volume", "kdb": "j", "type": "long", "desc": "Total volume in the bar." },
+        { "name": "transactions", "kdb": "j", "type": "long", "desc": "Number of ticks / trades aggregated into the bar." },
+        { "name": "source", "kdb": "s", "type": "symbol", "desc": "Origin tag for the bar." }
+      ]
+    },
+    {
+      "name": "fx_m1_dukasCopy",
+      "schema": "schema_efx.q",
+      "pipeline": "efx (external HDB)",
+      "group": "HDB-eFX",
+      "key": ["timestamp", "sym"],
+      "desc": "1-minute OHLC bars from the 'dukasCopy' vendor feed.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Bar start time (UTC)." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Currency pair." },
+        { "name": "open", "kdb": "f", "type": "float", "desc": "Open price of the minute." },
+        { "name": "high", "kdb": "f", "type": "float", "desc": "High price of the minute." },
+        { "name": "low", "kdb": "f", "type": "float", "desc": "Low price of the minute." },
+        { "name": "close", "kdb": "f", "type": "float", "desc": "Close price of the minute." },
+        { "name": "volume", "kdb": "f", "type": "float", "desc": "Total volume in the bar (fractional in this feed)." },
+        { "name": "ask_exchange", "kdb": "s", "type": "symbol", "desc": "Venue code for the ask side." },
+        { "name": "bid_exchange", "kdb": "s", "type": "symbol", "desc": "Venue code for the bid side." }
+      ]
+    },
+    {
+      "name": "fx_d1_massive",
+      "schema": "schema_efx.q",
+      "pipeline": "efx (external HDB)",
+      "group": "HDB-eFX",
+      "key": ["timestamp", "sym"],
+      "desc": "Daily OHLC bars from the 'massive' vendor feed.",
+      "columns": [
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Bar (day) start time (UTC)." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Currency pair." },
+        { "name": "open", "kdb": "f", "type": "float", "desc": "Day open price." },
+        { "name": "high", "kdb": "f", "type": "float", "desc": "Day high price." },
+        { "name": "low", "kdb": "f", "type": "float", "desc": "Day low price." },
+        { "name": "close", "kdb": "f", "type": "float", "desc": "Day close price." },
+        { "name": "volume", "kdb": "j", "type": "long", "desc": "Total volume for the day." },
+        { "name": "transactions", "kdb": "j", "type": "long", "desc": "Number of ticks / trades aggregated into the day." },
+        { "name": "source", "kdb": "s", "type": "symbol", "desc": "Origin tag for the bar." }
+      ]
+    },
+
+    {
+      "name": "eq_d1_yfinance",
+      "schema": "schema_eq.q",
+      "pipeline": "eq (external HDB)",
+      "group": "HDB-eq",
+      "key": ["date", "sym"],
+      "desc": "Daily OHLCV bars for US equities (NYSE + Nasdaq) from the stockData project's Yahoo Finance loader. Date-partitioned archive at C:/data/db1/eq (2010 -> present); read-only, openQ never writes it. No `timestamp column — the partition date is the only time key, and `sym is `p (parted) on disk.",
+      "columns": [
+        { "name": "date", "kdb": "d", "type": "date", "desc": "The bar's trading day. Virtual column from the on-disk date partitioning — there is no stored timestamp." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Ticker symbol. Parted (`p) attribute on disk." },
+        { "name": "open", "kdb": "f", "type": "float", "desc": "Session open price." },
+        { "name": "high", "kdb": "f", "type": "float", "desc": "Session high price." },
+        { "name": "low", "kdb": "f", "type": "float", "desc": "Session low price." },
+        { "name": "close", "kdb": "f", "type": "float", "desc": "Session close price." },
+        { "name": "volume", "kdb": "j", "type": "long", "desc": "Total shares traded on the day." },
+        { "name": "exchange", "kdb": "s", "type": "symbol", "desc": "Listing exchange — `nyse or `nasdaq." }
+      ]
+    },
+
+    {
+      "name": "eq_m1_yfinance",
+      "schema": "schema_eq.q",
+      "pipeline": "eq (external HDB)",
+      "group": "HDB-eq",
+      "key": ["date", "sym", "barTime"],
+      "desc": "1-minute OHLCV bars for Asian-market equities — Hong Kong (HKEX) and Tokyo / TSE (Nikkei) — from the yfinance intraday loader. Date-partitioned at C:/data/db1/eq alongside eq_d1_yfinance; read-only, openQ never writes it. Rolling ~1-month window only (Yahoo serves at most ~30 days of 1-minute history). Unlike eq_d1_yfinance this table carries a real `timestamp (openQ's mandatory tp,sym-first column) as well as `barTime, the minute the bar covers; `sym is `p (parted) on disk.",
+      "columns": [
+        { "name": "date", "kdb": "d", "type": "date", "desc": "Trading day. Virtual column from the on-disk date partitioning." },
+        { "name": "timestamp", "kdb": "p", "type": "timestamp", "desc": "Row ingest time (UTC) — the mandatory openQ first column. Close to, but not identical to, `barTime." },
+        { "name": "sym", "kdb": "s", "type": "symbol", "desc": "Yahoo-style ticker — e.g. `0001.HK (Hong Kong), `1301.T (Tokyo). Parted (`p) on disk." },
+        { "name": "barTime", "kdb": "p", "type": "timestamp", "desc": "Start of the 1-minute interval the OHLCV values cover, in exchange local session time. Minutes with no prints for a symbol are simply absent." },
+        { "name": "open", "kdb": "f", "type": "float", "desc": "First trade price in the minute." },
+        { "name": "high", "kdb": "f", "type": "float", "desc": "Highest trade price in the minute." },
+        { "name": "low", "kdb": "f", "type": "float", "desc": "Lowest trade price in the minute." },
+        { "name": "close", "kdb": "f", "type": "float", "desc": "Last trade price in the minute." },
+        { "name": "volume", "kdb": "j", "type": "long", "desc": "Shares traded during the minute." },
+        { "name": "exchange", "kdb": "s", "type": "symbol", "desc": "Market — `hkex (Hong Kong) or `nikkei (Tokyo / TSE)." }
+      ]
+    }
+  ]
+}

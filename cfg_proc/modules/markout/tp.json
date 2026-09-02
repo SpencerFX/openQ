@@ -1,0 +1,22 @@
+{
+  "procType": "tp",
+  "name": "markout_tp",
+  "port": 5030,
+  "schema": "../schemas/schema_markout.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "tp.q",
+    "../modules/utils/generator/generator.q"
+  ],
+  "params": {
+    "tplogdir": "../examples/data/markout/tplogs",
+    "bmode": 0
+  }
+}

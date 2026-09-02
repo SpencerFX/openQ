@@ -1,0 +1,22 @@
+{
+  "procType": "tp",
+  "name": "massive_tp",
+  "port": 5045,
+  "schema": "../schemas/schema_efx.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "tp.q",
+    "../modules/utils/generator/generator.q"
+  ],
+  "params": {
+    "tplogdir": "../examples/data/massive/tplogs",
+    "bmode": 0
+  }
+}

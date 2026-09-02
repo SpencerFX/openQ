@@ -1,0 +1,22 @@
+{
+  "procType": "gw",
+  "name": "eq_m1_yfinance_gw",
+  "port": 5119,
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "utils/gateway.q",
+    "query.q",
+    "gw.q"
+  ],
+  "params": {
+    "rdbaddr": ":localhost:5061",
+    "hdbaddr": ":localhost:5063"
+  }
+}

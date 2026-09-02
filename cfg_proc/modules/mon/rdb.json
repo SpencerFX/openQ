@@ -1,0 +1,26 @@
+{
+  "procType": "rdb",
+  "name": "mon_rdb",
+  "schema": "../schemas/schema_mon.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "rdb.q",
+    "utils/gateway.q",
+    "query.q",
+    "save.q"
+  ],
+  "params": {
+    "tpaddr": ":localhost:5024",
+    "hdbroot": "C:/data/db1/mon",
+    "port1": 5021,
+    "port2": 5101,
+    "instance": 1
+  }
+}

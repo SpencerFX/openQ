@@ -1,0 +1,26 @@
+{
+  "procType": "rdb",
+  "name": "eq_m1_yfinance_rdb",
+  "schema": "../schemas/schema_eq_m1_yfinance.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "rdb.q",
+    "utils/gateway.q",
+    "query.q",
+    "save.q"
+  ],
+  "params": {
+    "tpaddr": ":localhost:5060",
+    "hdbroot": "C:/data/db1/eq",
+    "port1": 5061,
+    "port2": 5116,
+    "instance": 1
+  }
+}

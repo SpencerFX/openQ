@@ -1,0 +1,3 @@
+Known gaps, called out rather than silently skipped
+Gateway doesn't hot-swap — gw.json's -rdbaddr still points at whichever port was active at gateway startup. Promoting instance 2 today means also repointing/restarting gw. Building the add/remove/switch-server verbs core/gw.q would need is the natural next step if you want the swap invisible to clients.
+tests/sh/run_pipeline_test.sh updated to start the pair and check standby isolation, but not executed — it (and run_idb_test.sh) does taskkill //F //IM q.exe on entry/exit, which would have killed your already-running platform, so I left it for you to run.

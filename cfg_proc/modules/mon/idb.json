@@ -1,0 +1,25 @@
+{
+  "procType": "idb",
+  "name": "mon_idb",
+  "port": 5022,
+  "schema": "../schemas/schema_mon.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "save.q",
+    "idb.q"
+  ],
+  "params": {
+    "rdbaddr": ":localhost:5021",
+    "rdbaddr2": ":localhost:5101",
+    "idbroot": "../examples/data/mon/idb_staging",
+    "hdbroot": "C:/data/db1/mon",
+    "checkpointfreq": "0D00:02:00"
+  }
+}

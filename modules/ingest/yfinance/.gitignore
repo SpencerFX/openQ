@@ -1,0 +1,7 @@
+.venv/
+hist/
+live/
+.stage/
+.stage_*.log
+exchanges/*_tickers.csv
+__pycache__/

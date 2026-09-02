@@ -1,0 +1,22 @@
+{
+  "procType": "hdb",
+  "name": "spread_hdb",
+  "port": 5058,
+  "schema": "../schemas/schema_spread.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "hdb.q",
+    "utils/gateway.q",
+    "query.q"
+  ],
+  "params": {
+    "hdbroot": "../examples/data/spread/hdb"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "procType": "hdb",
+  "name": "eq_hdb",
+  "port": 5090,
+  "schema": "../schemas/schema_eq.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "hdb.q",
+    "utils/gateway.q",
+    "query.q"
+  ],
+  "params": {
+    "hdbroot": "C:/data/db1/eq"
+  }
+}

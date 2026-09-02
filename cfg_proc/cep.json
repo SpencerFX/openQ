@@ -1,0 +1,23 @@
+{
+  "procType": "cep",
+  "name": "cep0",
+  "port": 5014,
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "tp.q",
+    "cep.q"
+  ],
+  "params": {
+    "srcaddr": ":localhost:5010",
+    "cepscript": "",
+    "tplogdir": "",
+    "bmode": 0
+  }
+}

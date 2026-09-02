@@ -1,0 +1,26 @@
+{
+  "procType": "rdb",
+  "name": "massive_rdb",
+  "schema": "../schemas/schema_efx.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "rdb.q",
+    "utils/gateway.q",
+    "query.q",
+    "save.q"
+  ],
+  "params": {
+    "tpaddr": ":localhost:5049",
+    "hdbroot": "../examples/data/massive/hdb",
+    "port1": 5046,
+    "port2": 5105,
+    "instance": 1
+  }
+}

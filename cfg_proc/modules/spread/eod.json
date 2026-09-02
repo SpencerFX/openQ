@@ -1,0 +1,23 @@
+{
+  "procType": "eod",
+  "name": "spread_eod",
+  "port": 5069,
+  "schema": "../schemas/schema_spread.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "save.q",
+    "eod.q"
+  ],
+  "params": {
+    "idbroot": "../examples/data/spread/idb_staging",
+    "hdbroot": "../examples/data/spread/hdb",
+    "eodDate": ""
+  }
+}

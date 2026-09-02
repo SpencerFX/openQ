@@ -1,0 +1,23 @@
+{
+  "procType": "eod",
+  "name": "mon_eod",
+  "port": 5066,
+  "schema": "../schemas/schema_mon.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "save.q",
+    "eod.q"
+  ],
+  "params": {
+    "idbroot": "../examples/data/mon/idb_staging",
+    "hdbroot": "C:/data/db1/mon",
+    "eodDate": ""
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "procType": "tp",
+  "name": "spread_tp",
+  "port": 5055,
+  "schema": "../schemas/schema_spread.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "tp.q",
+    "../modules/utils/generator/generator.q"
+  ],
+  "params": {
+    "tplogdir": "../examples/data/spread/tplogs",
+    "bmode": 0
+  }
+}

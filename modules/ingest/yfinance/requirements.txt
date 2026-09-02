@@ -1,0 +1,11 @@
+# yahoo_finance_streamer.py (US snapshot quotes -> tickerplant)
+yfinance
+qpython
+numpy
+
+# m1_*.py (per-exchange 1-minute OHLCV: universe / backfill / bulk load / feed)
+pandas>=2.0
+pyarrow>=14
+openpyxl>=3.1          # hkex universe (.xlsx)
+xlrd>=2.0.1            # nikkei universe (JPX data_j.xls, legacy .xls)
+# qpython + numpy (above) are also what `m1_feed.py --sink tp` needs

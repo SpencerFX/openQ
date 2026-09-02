@@ -1,0 +1,22 @@
+{
+  "procType": "hdb",
+  "name": "primefinance_hdb",
+  "port": 5075,
+  "schema": "../schemas/schema_primefinance.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "hdb.q",
+    "utils/gateway.q",
+    "query.q"
+  ],
+  "params": {
+    "hdbroot": "../examples/data/primefinance/hdb"
+  }
+}
