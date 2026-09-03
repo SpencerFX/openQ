@@ -9,7 +9,7 @@
 # same archive - set EFX_ROOT to point it elsewhere. Runs each example
 # alpha with the pipeline's own defaults (portfolio=direction,
 # risk=none, execution=immediate) - sma, meanrev, and candle (a
-# modules/backtest/candle.q pattern wrapped via .bt.alphas.candlePattern) -
+# modules/analytics/candle/candle.q pattern wrapped via .bt.alphas.candlePattern) -
 # then one run with every stage overridden to a non-default choice at
 # once, all against a single real day already confirmed to have
 # 1-minute bar data (aud_cad, 2020.01.15) -

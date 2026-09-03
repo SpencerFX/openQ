@@ -12,8 +12,7 @@
     "utils/perm.q"
   ],
   "libraries": [
-    "tp.q",
-    "../modules/utils/generator/generator.q"
+    "tp.q"
   ],
   "params": {
     "tplogdir": "../examples/data/spread/tplogs",

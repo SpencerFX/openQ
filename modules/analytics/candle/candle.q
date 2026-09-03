@@ -1,5 +1,5 @@
 //====================================================================
-// Directory: modules/backtest/candle.q
+// Directory: modules/analytics/candle/candle.q
 //
 // About:
 // Candlestick pattern recognition - 32 TA-Lib-style patterns (13

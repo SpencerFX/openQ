@@ -43,7 +43,7 @@
 // archive. -lookback is shared by meanrev and momentum (each reads it
 // independently - they're never selected together). -pattern is only
 // read when -strategy candle is chosen - any name from
-// candle.q's (its own sibling file) .candle.patternNames (default hammer).
+// modules/analytics/candle/candle.q's .candle.patternNames (default hammer).
 //
 // Example - swap in a risk overlay and a slower execution style with no
 // code changes:
