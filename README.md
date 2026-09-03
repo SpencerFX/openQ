@@ -13,8 +13,9 @@ core/utils/       log, timer, ipc, conn, servers, perm, gateway, logToTab
 schemas/          schema.q (generic demo) + one schema_*.q per module/archive
 cfg_proc/         one JSON config per role/module, for initFromCfg.q
 modules/analytics/<name>/  spread, markout, primeFinance, report - each
-                  paired with its own cep.q/simulator.q
-modules/backtest/ backtest.q engine, candle.q patterns, run.q
+                  paired with its own cep.q/simulator.q; candle/ is a plain
+                  pattern library (no process role), used by backtest
+modules/backtest/ backtest.q engine, run.q
 modules/ingest/<name>/     feed-handler-fronted modules (massive,
                   massive_stocks); modules/ingest/yfinance/ is a separate
                   Python-only ingest, no cep.q - see its own README

@@ -36,9 +36,9 @@
 // modules/backtest/run.q loads this file repo-root-relative
 // (`system "l modules/backtest/backtest.q"`, run from the repo root, not
 // core-relative like every other module's cep.q) - so candle.q's own
-// load path here (its own sibling file) has to match that same
-// repo-root-relative convention.
-system "l modules/backtest/candle.q";
+// load path here (its own folder under modules/analytics/, no longer a
+// sibling file) has to match that same repo-root-relative convention.
+system "l modules/analytics/candle/candle.q";
 
 .oq.info.backtest.loaded:0b;
 
@@ -212,7 +212,7 @@ system "l modules/backtest/candle.q";
 //@desc
 //   bars: OHLC bar table (timestamp,sym,open,high,low,close,...)
 //   pat: a name from .candle.patternNames (e.g. `hammer`, `engulfing`,
-//        `morningStar`) - see candle.q, its own sibling file
+//        `morningStar`) - see modules/analytics/candle/candle.q
 // Wraps candle.q's pattern library as an alpha: runs the
 // named pattern over bars and normalizes its result into a signed
 // direction column regardless of which of the library's two native

@@ -84,7 +84,7 @@
 //@desc
 //The one place new column types need adding if a future schema uses one
 //not already listed - every type char actually used across schemas/*.q
-//today (p/s/f/j/i, plus the untyped/general-list " ") is covered. Numeric
+//today (p/n/s/f/j/i, plus the untyped/general-list " ") is covered. Numeric
 //types are generated non-negative in a modest range (0-999/0-99999) since
 //every numeric column in this repo's own schemas - prices, sizes, counts,
 //pids, ports, memory - is naturally non-negative; a column that genuinely
@@ -94,6 +94,7 @@
 //@desc
 .gen.forType:{[ty;n]
  $[ty="p"; .z.p-n?0D01:00:00.000000000;
+   ty="n"; n?0D01:00:00.000000000;
    ty="d"; .z.d-n?365;
    ty="s"; .gen.priv.randSyms[n];
    ty="f"; n?1000f;
