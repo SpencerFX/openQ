@@ -3,20 +3,11 @@
 //
 // About:
 // Drives a running primefinance module through a realistic sequence of
-// events and prints what the CEP ends up holding. Two distinct paths are
-// exercised, matching how the CEP's handlers are actually wired
-// (see cep.q, its own sibling file):
-//   - inventory/position/recall are published onto the real tp -> cep
-//     wire (.oq.cep.dispatch runs both the relay handler and, for
-//     recall, .prime.applyRecall reactively) - this is the live,
-//     multi-process path real market/ops data would take.
-//   - locate requests are NOT wired to any incoming event (only
-//     inventory/position/borrow/recall are passively recorded, and only
-//     recall triggers computation) - .prime.allocate/.prime.newLocate is
-//     only ever invoked directly. The simulator defines one small remote
-//     wrapper on the CEP (closing over its own live .prime.inventory)
-//     and calls it over ordinary functional IPC, the same way a real
-//     OMS/allocation caller would reach a running CEP.
+// events and prints what the CEP ends up holding. inventory/position/
+// borrow/recall publish onto the real tp -> cep wire; locate requests are
+// driven straight into the CEP over functional IPC (.prime.allocate/
+// .prime.newLocate is never wired to an incoming event), same as a real
+// OMS/allocation caller would reach a running CEP.
 //
 // Run (needs a live primefinance_tp + primefinance_cep, e.g. via
 // scripts/startupAllByModule.sh primefinance):
@@ -54,9 +45,8 @@ tph (`upd;`inventory;{invTbl x} each cols invTbl);
 //---------------------------------------------------------------
 // 2) Positions: a few clients short various names, some heavily so
 //---------------------------------------------------------------
-/ column order matches schema_primefinance.q's position table (timestamp,
-/ sym,client,...) exactly - upd zips incoming data against the schema's
-/ own column order positionally, so a mismatch here silently swaps values
+/ column order matches schema_primefinance.q's position table exactly -
+/ upd zips positionally, so a mismatch here silently swaps values
 posTbl:([]
   timestamp:5#now;
   sym:`AAPL`TSLA`GME`NVDA`NVDA;
@@ -69,9 +59,7 @@ tph (`upd;`position;{posTbl x} each cols posTbl);
 
 //---------------------------------------------------------------
 // 3) Locate requests - driven straight into the CEP over IPC, against
-//    the live .prime.inventory the wire publish above just populated
-//    there. runLocate is defined once on the CEP so each call below is
-//    ordinary functional IPC with real values, not a query string.
+//    the live .prime.inventory the wire publish above just populated.
 //---------------------------------------------------------------
 ceph "runLocate:{[locateID;client;sym;requested;priority;constraints]",
   ".prime.newLocate[locateID;client;sym;requested;priority;.prime.inventory;constraints;.z.p+0D00:30:00]}";
@@ -88,6 +76,23 @@ show ceph(`runLocate;9002j;`FUND1;`TSLA;35000;80;constraints);
 show ceph(`runLocate;9003j;`FUND2;`GME;6000;60;constraints);
 -1 "  FUND3 / NVDA, requested 90000:";
 show ceph(`runLocate;9004j;`FUND3;`NVDA;90000;70;constraints);
+
+//---------------------------------------------------------------
+// 3b) Borrows: realized borrows against two locates above, so
+//     .prime.expo.build has real active exposure to show. Column order
+//     matches schema_primefinance.q's borrow table exactly (upd zips positionally).
+//---------------------------------------------------------------
+borrowTbl:([]
+  timestamp:2#now;
+  sym:`AAPL`NVDA;
+  client:`FUND1`FUND3;
+  lender:`PB`PB;
+  qty:100000 90000;
+  feeBp:25 15f;
+  expiry:2#now+1D);
+
+tph (`upd;`borrow;{borrowTbl x} each cols borrowTbl);
+-1 "published ",(string count borrowTbl)," borrow row(s)";
 
 //---------------------------------------------------------------
 // 4) Recall: pull back part of PB's AAPL reservation from FUND1's locate
@@ -119,6 +124,14 @@ show ceph "select from .prime.alerts";
 -1 "";
 -1 "coverage by client,sym (.prime.positionCoverage against live state):";
 show ceph "0!.prime.positionCoverage[.prime.positions;.prime.locates;.z.p]";
+
+/ cep.q's own market refresh already ran once at CEP boot, before the
+/ borrows above existed - trigger it again now so exposure reflects them
+/ without waiting for the next 5-minute timer tick.
+ceph (`.primeMod.market.refresh;::);
+-1 "";
+-1 "lender exposure (.prime.exposure, rebuilt against the borrows just published):";
+show ceph "select from .prime.exposure";
 
 hclose tph;
 hclose ceph;
