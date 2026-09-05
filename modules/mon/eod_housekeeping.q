@@ -8,7 +8,7 @@
 // .oq.idb.eod[dt] via IPC on the already-running mon idb (-idbaddr) -
 // final pivot-and-harvest, promote the day's segments, clear -idbroot so
 // the next day restarts at segment 0. Same mechanism eq_m1_yfinance's
-// housekeeping uses (modules/ingest/yfinance/eod_housekeeping.q); this is
+// housekeeping uses (modules/ingest/yfinance/q/eod_housekeeping.q); this is
 // the generic, table-agnostic version - it drives .oq.schema.tables[]
 // rather than naming a table, so nothing here is mon-specific beyond the
 // schema it loads.
@@ -40,6 +40,15 @@
 // leave an empty dir behind well before a real promote.
 //====================================================================
 system "l ../schemas/schema_mon.q";
+
+// jobStatus tracking for the scheduled EOD promote (.oq.hk.run). Same
+// best-effort contract as this file's own .util.log.ex calls: a process
+// with no mon tickerplant handle still runs the EOD, it just doesn't get
+// a `jobStatus` row. Guarded so a missing/broken jobStatus.q can never
+// stop the housekeeping script loading - .oq.hk.run checks `run in key
+// `.mon.job before using it and falls back to the plain promote.
+@[{system "l ../modules/mon/jobStatus.q"};`;
+  {[e].util.log.ex[`WARN;`eodHousekeeping]"jobStatus.q not loaded - scheduled EODs will run untracked: ",e}];
 
 .oq.hk.info.eodHousekeeping.loaded:0b;
 
@@ -116,11 +125,23 @@ system "l ../schemas/schema_mon.q";
    :(::)];
  .oq.hk.eodConnect[];
  if[null .oq.hk.idbH;:(::)];
- r:@[.oq.hk.idbH;(`.oq.idb.eod;target);
-   {[e].util.log.ex[`ERROR;`.oq.hk.run]"Scheduled EOD call failed: ",e;`FAILED}];
- if[r~`FAILED;:(::)];
- @[{[dt] .oq.hk.markerFile[dt] set ()};target;
-   {[e].util.log.ex[`WARN;`.oq.hk.run]"EOD succeeded but writing the marker file failed (next tick will retry the whole promote): ",e}];
+ // the promote + marker write, as one niladic unit so .mon.job.run can
+ // wrap it (RUNNING row on entry, SUCCESS/FAILED on exit -> the mon
+ // `jobStatus` table -> the dashboard's JobStatus page). A signal from
+ // here (idb returned `FAILED, or the marker write threw) leaves no
+ // marker file, so the next tick retries the whole promote - unchanged
+ // from before jobStatus tracking. jobStatus.q absent => run it plain.
+ // target (a bound projection below, not the bare function) - a nested
+ // lambda here can't see .oq.hk.run's own locals, only true globals and
+ // its own params/closure, so target must be bound in before it's handed
+ // off rather than referenced free inside promote's body.
+ promote:{[target]
+   if[`FAILED~.oq.hk.idbH (`.oq.idb.eod;target);'"idb .oq.idb.eod returned `FAILED"];
+   .oq.hk.markerFile[target] set ();
+   };
+ ok:@[{[f] $[`run in key `.mon.job;.mon.job.run[`mon_eod_housekeeping;f];f[]]; 1b}[promote[target]];
+   {[e].util.log.ex[`ERROR;`.oq.hk.run]"Scheduled EOD failed: ",e;0b}];
+ if[not ok;:(::)];
  .util.log.ex[`INFO;`.oq.hk.run]"Scheduled EOD triggered for ",string target;
  };
 

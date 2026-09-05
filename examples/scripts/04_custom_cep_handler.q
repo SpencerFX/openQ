@@ -24,7 +24,7 @@
 // relay loop.
 //
 // Prerequisite: the default pipeline's tickerplant running, e.g.:
-//   ./scripts/startup.sh
+//   ./scripts/startStop/startup.sh
 //
 // Run this AS A CEP, from core/ (cepscript paths are core-relative,
 // matching every real module's cep.q):
@@ -44,7 +44,7 @@
 // failed for quote: type" lines during the initial replay - that's
 // this handler meeting old rows shaped differently than schema.q's
 // current quote, not a bug in the handler itself; a fresh tickerplant
-// (or the one ./scripts/startup.sh just started) won't have any.
+// (or the one ./scripts/startStop/startup.sh just started) won't have any.
 //====================================================================
 
 // The derived output table this handler produces - like any openQ

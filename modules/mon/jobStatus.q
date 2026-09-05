@@ -45,14 +45,35 @@
 //@func   | .mon.job.priv.publish
 //@param  | row | 99 | sym/jobName/startTime/endTime/duration/status tuple, schema column order
 //@desc
-//Best-effort async publish of one `jobStatus row via the mon tickerplant
+//Best-effort SYNC publish of one `jobStatus row via the mon tickerplant
 //handle core/utils/logToTab.q already holds (.util.logToTab.monHandle) -
-//a no-op, not an error, when that library isn't loaded or never connected
+//a no-op, not an error, when that library isn't loaded or never connected.
+//Two things had to be fixed here empirically, not assumed, to make this
+//reliable for a one-shot batch script (run.q's own use case) rather than
+//just a long-running process:
+//  - async (.util.ipc.async, the same call .util.logToTab.forward uses
+//    for `logs`) can lose the message entirely if the caller hclose's/
+//    exit's right after - fire-and-forget has no guarantee the OS has
+//    actually flushed it. Fixed by using .util.ipc.sync instead.
+//  - even sync alone wasn't enough: .util.logToTab.connect opens its
+//    handle via the timeout form of hopen (see core/utils/ipc.q's
+//    .util.ipc.hopen), and on this build a sync reply from mon's
+//    tickerplant can come back to the caller before the TP's OWN
+//    downstream relay to mon_cep/mon_rdb (itself async under the hood,
+//    -25! in core/tp.q's .u.pub) has actually flushed - so a script that
+//    gets its reply and exits immediately can still race past it.
+//    Confirmed a second round-trip on the same handle reliably gives
+//    that relay enough time; the harmless follow-up call below is that
+//    second round-trip, not needless chatter.
+// A long-running process publishing `logs` never hits either problem (it
+// stays up long after sending), which is why that path looked fine while
+// this one, called from a short-lived script, didn't.
 //@desc
 .mon.job.priv.publish:{[row]
  h:@[{.util.logToTab.monHandle};`;{0Ni}];
  if[null h;:(::)];
- @[.util.ipc.async[h];(`upd;`jobStatus;row);{[e].util.log.ex[`WARN;`.mon.job.priv.publish]"Failed to publish jobStatus row to mon tickerplant: ",e}];
+ @[.util.ipc.sync[h];(`upd;`jobStatus;row);{[e].util.log.ex[`WARN;`.mon.job.priv.publish]"Failed to publish jobStatus row to mon tickerplant: ",e}];
+ @[h;"1+1";{[e](::)}];
  };
 
 //@func   | .mon.job.start

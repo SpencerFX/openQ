@@ -171,6 +171,7 @@
 //@param  | sDate | date
 //@param  | eDate | date
 //@param  | name | symbol
+//@param  | tabs | -11 | optional - overrides schemaFile's own .oq.schema.tables[]
 //@desc
 //   hdbroot: root of an on-disk partitioned HDB, e.g. `:../examples/
 //        data/spread/hdb or a real external archive's root
@@ -187,6 +188,16 @@
 //   name: caller-supplied identifier for this HDB/deployment, stored
 //        in the result's `sym` column (there's no live process to read
 //        a real `-name` off)
+//   tabs: an empty list (the default, `symbol$()) uses schemaFile's own
+//        .oq.schema.tables[] unchanged - the right choice for a schema
+//        that already declares exactly the tables this hdbroot holds
+//        (e.g. schema_efx_bars.q for the efx archive). A non-empty list
+//        instead scans exactly those table names, letting a BROADER
+//        multi-root schema (e.g. schema_yfinance.q, which declares
+//        every yfinance-family table across several different physical
+//        roots) be reused for a scan of just the subset that actually
+//        lives under THIS hdbroot, instead of hand-duplicating a
+//        one-off scan-only schema file per root just to narrow the list.
 // For every table in the schema: reads every on-disk partition's
 // timestamp column exactly once (.oq.hk.priv.partitionStats) to get
 // that table's whole-history summary (rowCountTotal, partitionCnt,
@@ -198,11 +209,11 @@
 // .oq.hk.tableHealth's shape, one row per (table,date) actually
 // scanned, across every table in the schema.
 //@desc
-.oq.hk.scanHDB:{[hdbroot;schemaFile;sDate;eDate;name]
+.oq.hk.scanHDB:{[hdbroot;schemaFile;sDate;eDate;name;tabs]
   .util.core.loadScript schemaFile;
   root:hdbroot;
   scanDates:asc distinct sDate+til 1+eDate-sDate;
-  tabs:.oq.schema.tables[];
+  tabs:$[count tabs;tabs;.oq.schema.tables[]];
   now:.z.p;
   raze {[root;scanDates;name;now;tab]
     allDates:.oq.hk.priv.allDates root;

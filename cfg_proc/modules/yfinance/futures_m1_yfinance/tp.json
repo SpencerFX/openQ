@@ -1,0 +1,21 @@
+{
+  "procType": "tp",
+  "name": "futures_m1_yfinance_tp",
+  "port": 5084,
+  "schema": "../schemas/schema_yfinance.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "tp.q"
+  ],
+  "params": {
+    "tplogdir": "../examples/data/futures_m1_yfinance/tplogs",
+    "bmode": 1
+  }
+}

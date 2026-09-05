@@ -1,0 +1,25 @@
+{
+  "procType": "idb",
+  "name": "eq_m1_yfinance_idb",
+  "port": 5117,
+  "schema": "../schemas/schema_yfinance.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "save.q",
+    "idb.q"
+  ],
+  "params": {
+    "rdbaddr": ":localhost:5061",
+    "rdbaddr2": ":localhost:5116",
+    "idbroot": "../examples/data/eq_m1_yfinance/idb_staging",
+    "hdbroot": "C:/data/db1/eq",
+    "checkpointfreq": "0D00:15:00"
+  }
+}

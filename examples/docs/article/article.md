@@ -146,7 +146,7 @@ Every piece of domain logic in this repo - `mon`, `markout`, `spread`,
 above, and never touching or copying `core/`. `core/initFromCfg.q` reads
 a JSON file (`cfg_proc/modules/<name>/tp.json`, `rdb.json`,
 `idb.json`, ...) instead of a long CLI flag list, and
-`scripts/startupAllByModule.sh <name>` starts whatever roles a module
+`scripts/startStop/startupAllByModule.sh <name>` starts whatever roles a module
 actually defines, in the right order, from one command. A module's
 *only* new code is what's genuinely custom to its domain - a schema file
 and a `-cepscript` - because `tp.q`/`rdb.q`/`idb.q`/`hdb.q` are already

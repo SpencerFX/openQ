@@ -8,7 +8,7 @@
 //
 // Prerequisite: the default pipeline running (tp/rdb/hdb/gw on
 // 5010-5013), e.g.:
-//   ./scripts/startup.sh
+//   ./scripts/startStop/startup.sh
 //
 // Run from the repo root:
 //   q examples/scripts/01_publish_and_query.q

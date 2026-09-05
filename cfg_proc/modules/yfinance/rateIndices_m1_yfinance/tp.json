@@ -1,0 +1,21 @@
+{
+  "procType": "tp",
+  "name": "rateIndices_m1_yfinance_tp",
+  "port": 5080,
+  "schema": "../schemas/schema_yfinance.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "tp.q"
+  ],
+  "params": {
+    "tplogdir": "../examples/data/rateIndices_m1_yfinance/tplogs",
+    "bmode": 1
+  }
+}

@@ -19,7 +19,7 @@
 // modules/analytics/report/ directory) - no per-client breakdown.
 //
 // Run (needs a live spread_tp, e.g. via
-// scripts/startupAllByModule.sh spread):
+// scripts/startStop/startupAllByModule.sh spread):
 //   q modules/analytics/spread/simulator.q [-tpaddr :host:port]
 // Default matches cfg_proc/modules/spread/tp.json's port.
 //====================================================================

@@ -32,7 +32,7 @@
 // points, without any real wall-clock wait.
 //
 // Run (needs a live markout_tp, e.g. via
-// scripts/startupAllByModule.sh markout):
+// scripts/startStop/startupAllByModule.sh markout):
 //   q modules/analytics/markout/simulator.q [-tpaddr :host:port]
 // Default matches cfg_proc/modules/markout/tp.json's port.
 //====================================================================

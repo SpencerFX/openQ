@@ -1,5 +1,6 @@
 .venv/
 hist/
+hist_d1/
 live/
 .stage/
 .stage_*.log
