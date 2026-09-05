@@ -1,0 +1,26 @@
+{
+  "procType": "rdb",
+  "name": "fx_m1_yfinance_rdb",
+  "schema": "../schemas/schema_yfinance.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "rdb.q",
+    "utils/gateway.q",
+    "query.q",
+    "save.q"
+  ],
+  "params": {
+    "tpaddr": ":localhost:5140",
+    "hdbroot": "C:/data/db1/efx",
+    "port1": 5141,
+    "port2": 5138,
+    "instance": 1
+  }
+}

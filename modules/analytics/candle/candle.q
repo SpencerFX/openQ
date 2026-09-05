@@ -271,26 +271,57 @@
   (b>0) & (b<=.4*r) & (t[`high]-(t[`open]|t[`close])>=.2*r) & ((t[`open]&t[`close])-t[`low]>=.2*r)
   };
 
+// hammer/hangingMan and invertedHammer/shootingStar are each the exact
+// same candle SHAPE - what actually distinguishes them in real usage is
+// the preceding trend (hammer/invertedHammer are bullish-reversal reads,
+// only meaningful after a decline; hangingMan/shootingStar are
+// bearish-reversal reads, only meaningful after a rally). An earlier
+// version of this file ported hangingMan/shootingStar as bare aliases of
+// hammer/invertedHammer with no trend check at all - confirmed empirically
+// against real eq_m1_yfinance data: they fired on the exact same bars,
+// every time, which can't be right for two patterns TA-Lib documents as
+// opposite-direction signals. .candle.priorTrend is a standard (not
+// TA-Lib's own unpublished internal formula) lagged trend read: the CLOSE
+// immediately before this bar, against a short trailing SMA of closes
+// also ending at that prior bar - lagged so the current candle can't bias
+// its own trend context. Null/insufficient history (a symbol's first few
+// bars) reads as trend 0, so neither pattern fires there.
+.candle.priorTrend:{[t;lookback]
+  pc:prev t[`close];
+  sma:lookback mavg pc;
+  ?[pc>sma;1;?[pc<sma;-1;0]]
+  };
+
 .candle.hammer:{[t]
   b:.candle.realBody t;
   u:.candle.upperShadow t;
   l:.candle.lowerShadow t;
-  (b>0)&(l>=2*b)&(u<=b)
+  shape:(b>0)&(l>=2*b)&(u<=b);
+  shape&.candle.priorTrend[t;5]=-1
   };
 
 .candle.hangingMan:{[t]
-  .candle.hammer t
+  b:.candle.realBody t;
+  u:.candle.upperShadow t;
+  l:.candle.lowerShadow t;
+  shape:(b>0)&(l>=2*b)&(u<=b);
+  shape&.candle.priorTrend[t;5]=1
   };
 
 .candle.invertedHammer:{[t]
   b:.candle.realBody t;
   u:.candle.upperShadow t;
   l:.candle.lowerShadow t;
-  (b>0)&(u>=2*b)&(l<=b)
+  shape:(b>0)&(u>=2*b)&(l<=b);
+  shape&.candle.priorTrend[t;5]=-1
   };
 
 .candle.shootingStar:{[t]
-  .candle.invertedHammer t
+  b:.candle.realBody t;
+  u:.candle.upperShadow t;
+  l:.candle.lowerShadow t;
+  shape:(b>0)&(u>=2*b)&(l<=b);
+  shape&.candle.priorTrend[t;5]=1
   };
 
 .candle.marubozu:{[t]
@@ -310,8 +341,21 @@
   .candle.bodyLong t
   };
 
+// bodyShort alone isn't "short line" - BodyLong and BodyShort share the
+// same threshold (both realBody/10/1f), so body>=avg and body<=avg
+// between them cover essentially every bar (confirmed empirically: on a
+// real day of eq_m1_yfinance 1-minute bars, longLine+shortLine summed to
+// exactly the total bar count, with tens of thousands of bars satisfying
+// BOTH at once whenever body sits at/near its own trailing average, e.g.
+// several flat/stale bars in a row). A real "short line" bar needs to be
+// quiet all over, not just small-bodied - .candle.shadowShort was already
+// defined for exactly this (both shadows short too) but never called
+// anywhere; wiring it in here is the fix, not a new primitive.
 .candle.shortLine:{[t]
-  .candle.bodyShort t
+  b:.candle.bodyShort t;
+  u:.candle.upperShadow t;
+  l:.candle.lowerShadow t;
+  b&.candle.shadowShort[t;u]&.candle.shadowShort[t;l]
   };
 
 .candle.engulfing:{[t]

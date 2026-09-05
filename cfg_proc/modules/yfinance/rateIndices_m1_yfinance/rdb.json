@@ -1,0 +1,26 @@
+{
+  "procType": "rdb",
+  "name": "rateIndices_m1_yfinance_rdb",
+  "schema": "../schemas/schema_yfinance.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "rdb.q",
+    "utils/gateway.q",
+    "query.q",
+    "save.q"
+  ],
+  "params": {
+    "tpaddr": ":localhost:5080",
+    "hdbroot": "C:/data/db1/rates",
+    "port1": 5081,
+    "port2": 5136,
+    "instance": 1
+  }
+}

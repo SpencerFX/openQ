@@ -28,7 +28,7 @@
 // A one-shot batch job, not a long-running server: .oq.eod.init runs the
 // promotion once for -eodDate (or today) and exits, the same lifecycle a
 // cron-triggered EOD job would have - it's deliberately not part of
-// scripts/startupAll*.sh's always-on process set.
+// scripts/startStop/startupAll*.sh's always-on process set.
 //
 // Namespaces:
 //   .oq.eod.*   - loads one idb writer's checkpointed segments for a date

@@ -1,0 +1,22 @@
+{
+  "procType": "hdb",
+  "name": "futures_m1_yfinance_hdb",
+  "port": 5087,
+  "schema": "../schemas/schema_yfinance.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "hdb.q",
+    "utils/gateway.q",
+    "query.q"
+  ],
+  "params": {
+    "hdbroot": "C:/data/db1/futures"
+  }
+}

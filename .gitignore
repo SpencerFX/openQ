@@ -1,6 +1,8 @@
 examples/data/
 tests/logs/
 scripts/logs/
+modules/ingest/yfinance/logs/
+*.log
 .env
 __pycache__/
 *.pyc

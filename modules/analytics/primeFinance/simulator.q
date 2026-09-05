@@ -10,7 +10,7 @@
 // OMS/allocation caller would reach a running CEP.
 //
 // Run (needs a live primefinance_tp + primefinance_cep, e.g. via
-// scripts/startupAllByModule.sh primefinance):
+// scripts/startStop/startupAllByModule.sh primefinance):
 //   q modules/analytics/primeFinance/simulator.q [-tpaddr :host:port] [-cepaddr :host:port]
 // Defaults match cfg_proc/modules/primefinance/{tp,cep}.json's ports.
 //====================================================================

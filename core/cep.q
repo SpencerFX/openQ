@@ -56,9 +56,26 @@
 //@param  | t | -11 | Table name
 //@param  | x | 98 0 | Data
 //@desc
-//Runs every handler registered for t, trapping and logging each independently
+//Runs every handler registered for t, trapping and logging each independently.
+//A live tick always arrives as a table (tp.q's updNL/updB convert x from a
+//raw list of column vectors to a table before calling pub[] - see their own
+//headers), but the on-disk tplog is written just before that conversion, so
+//a replayed tick (a fresh source connection's "replaying missed log
+//segment", or a reconnect racing a write) hands x through exactly as
+//logged - the pre-conversion raw list. A handler that indexes by column
+//name (0!x, select from x, x`col - every handler in this codebase does)
+//works on the former and throws type on the latter. Normalizing here,
+//the same conversion tp.q itself does, means every handler always sees a
+//table regardless of how x arrived; wrapped in .[] since it needs t's
+//schema table to still be defined the normal way (key flip value t) and
+//should never take dispatch down if something about that assumption is off
 //@desc
 .oq.cep.dispatch:{[t;x]
+ x:.[
+   {[t;x] $[98=type x;x;[f:key flip value t;$[0>type first x;enlist f!x;flip f!x]]]};
+   (t;x);
+   {[t;x;e].util.log.ex[`WARN;`.oq.cep.dispatch]"Could not normalize data for ",(string t),": ",e;x}[t;x]
+  ];
  fns:exec fn from .oq.cep.handlers where tab=t;
  {[t;x;fn] .[fn;(t;x);{[t;e].util.log.ex[`ERROR;`.oq.cep.dispatch]"Handler failed for ",(string t),": ",e}[t]]}[t;x] each fns;
  };

@@ -31,12 +31,30 @@
 // under the same -monroot, e.g. `tableHealth` for the bar-level
 // schema and `tableHealthTick` for the tick-level one.
 //
+// -tables optionally overrides -schema's own .oq.schema.tables[] with
+// an explicit space-separated table-name list, scanning exactly those
+// instead. This is what lets a schema file that declares MORE tables
+// than this one -hdbroot actually holds (e.g. schemas/schema_yfinance.q,
+// whose tables are spread across several physical roots -
+// C:/data/db1/eq, .../futures, .../rates, .../efx) still be reused here
+// - no need for a dedicated single-root scan-only schema file just to
+// narrow the list down; the same schema that already declares the
+// table's real shape (kept in sync with the live ingest pipeline) is
+// enough on its own.
+//
 // Run from the repo root, like every other examples/scripts/*.q file:
 //   q examples/scripts/05_table_health_scan.q \
 //     -hdbroot C:/data/db1/efx -schema schemas/schema_efx_bars.q \
 //     -monroot C:/data/db1/mon -savetab tableHealth -name efx
 // (add -sDate/-eDate to bound it to a smaller window instead of the
 // archive's full history)
+//
+// Scanning just the eq root's own minute-bar table, reusing the shared
+// yfinance schema instead of a one-off eq-only schema file:
+//   q examples/scripts/05_table_health_scan.q \
+//     -hdbroot C:/data/db1/eq -schema schemas/schema_yfinance.q \
+//     -tables eq_m1_yfinance \
+//     -monroot C:/data/db1/mon -savetab tableHealthEq -name eq
 //====================================================================
 
 system "l core/utils/log.q";
@@ -52,6 +70,7 @@ schema:   opt[args;`schema;"schemas/schema_efx_bars.q"];
 monroot: `$":",opt[args;`monroot;"C:/data/db1/mon"];
 savetab:  `$opt[args;`savetab;"tableHealth"];
 name:     `$opt[args;`name;"efx"];
+tabList:  $[`tables in key args;`$args`tables;`symbol$()];
 
 .util.core.loadScript schema;
 allDates:.oq.hk.priv.allDates hdbroot;
@@ -63,7 +82,7 @@ eDate:$[`eDate in key args;"D"$first args`eDate;last allDates];
 -1 "Scanning ",(string hdbroot)," for ",(string sDate)," to ",(string eDate)," (schema: ",schema,")";
 -1 "This reads every on-disk partition's timestamp column once per table - see the file header before pointing this at a tick-level schema.";
 
-health:.oq.hk.scanHDB[hdbroot;schema;sDate;eDate;name];
+health:.oq.hk.scanHDB[hdbroot;schema;sDate;eDate;name;tabList];
 
 -1 "";
 -1 "=== whole-table summary ===";

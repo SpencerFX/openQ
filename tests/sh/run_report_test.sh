@@ -2,7 +2,7 @@
 # tests/sh/run_report_test.sh
 # Acceptance test for the report module (modules/analytics/report/cep.q +
 # deskRisk.q - see README's "Desk Risk & TCA" section): starts
-# spread/markout/primeFinance via the existing scripts/startupAllByModule.sh
+# spread/markout/primeFinance via the existing scripts/startStop/startupAllByModule.sh
 # (each already has a complete cfg_proc/modules/<name>/ set - no reason to
 # hand-roll individual init.q calls for a 6-process trio the way the
 # single-pipeline tests above do), runs each module's own simulator once,
@@ -33,10 +33,10 @@ check() {
 }
 
 cleanup() {
-  "$ROOT/scripts/shutdownAllByModule.sh" report > /dev/null 2>&1
-  "$ROOT/scripts/shutdownAllByModule.sh" primeFinance > /dev/null 2>&1
-  "$ROOT/scripts/shutdownAllByModule.sh" markout > /dev/null 2>&1
-  "$ROOT/scripts/shutdownAllByModule.sh" spread > /dev/null 2>&1
+  "$ROOT/scripts/startStop/shutdownAllByModule.sh" report > /dev/null 2>&1
+  "$ROOT/scripts/startStop/shutdownAllByModule.sh" primeFinance > /dev/null 2>&1
+  "$ROOT/scripts/startStop/shutdownAllByModule.sh" markout > /dev/null 2>&1
+  "$ROOT/scripts/startStop/shutdownAllByModule.sh" spread > /dev/null 2>&1
 }
 trap cleanup EXIT
 
@@ -46,9 +46,9 @@ rm -rf "$DATA/spread" "$DATA/markout" "$DATA/report"
 mkdir -p "$LOGS"
 
 echo "=== starting spread, markout, primeFinance ==="
-"$ROOT/scripts/startupAllByModule.sh" spread
-"$ROOT/scripts/startupAllByModule.sh" markout
-"$ROOT/scripts/startupAllByModule.sh" primeFinance
+"$ROOT/scripts/startStop/startupAllByModule.sh" spread
+"$ROOT/scripts/startStop/startupAllByModule.sh" markout
+"$ROOT/scripts/startStop/startupAllByModule.sh" primeFinance
 sleep 2
 
 echo "=== running each module's simulator ==="
@@ -58,7 +58,7 @@ echo "=== running each module's simulator ==="
 sleep 2
 
 echo "=== starting report (picks up fresh data on its immediate startup refresh) ==="
-"$ROOT/scripts/startupAllByModule.sh" report
+"$ROOT/scripts/startStop/startupAllByModule.sh" report
 sleep 2
 
 echo "=== checking .report.latest ==="

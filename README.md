@@ -11,7 +11,8 @@ core/             tp/rdb/hdb/gw/cep/idb/eod/housekeeping/fh roles, config.q,
                   init.q (CLI-flag bootstrap), initFromCfg.q (JSON bootstrap)
 core/utils/       log, timer, ipc, conn, servers, perm, gateway, logToTab
 schemas/          schema.q (generic demo) + one schema_*.q per module/archive
-cfg_proc/         one JSON config per role/module, for initFromCfg.q
+cfg_proc/         one JSON config per role/module, for initFromCfg.q -
+                  the *_yfinance ones are generated, see cfg_proc/modules/README.md
 modules/analytics/<name>/  spread, markout, primeFinance, report - each
                   paired with its own cep.q/simulator.q; candle/ is a plain
                   pattern library (no process role), used by backtest
@@ -20,13 +21,16 @@ modules/ingest/<name>/     feed-handler-fronted modules (massive,
                   massive_stocks); modules/ingest/yfinance/ is a separate
                   Python-only ingest, no cep.q - see its own README
 modules/utils/<name>/      generator, hdb2tplog, replay - standalone libs
+scripts/qcon/      remote console (qcon.q + its .sh/.ps1 launchers)
+scripts/startStop/ start/stop the platform (startup.sh/startupAll*.sh + shutdown*.sh)
+scripts/other/     candlePattern batch/backfill/scheduling (see "candle.q" below)
 tests/sh/, tests/q/        acceptance tests and the scripts they drive
 ```
 
 ## Running it
 
 ```
-./scripts/startup.sh       # tp+rdb+hdb+gw on 5010-5013, ./scripts/shutdown.sh to stop
+./scripts/startStop/startup.sh       # tp+rdb+hdb+gw on 5010-5013, ./scripts/startStop/shutdown.sh to stop
 ```
 
 Config-driven alternative (`cfg_proc/*.json`, no CLI-flag list):
@@ -35,9 +39,9 @@ Config-driven alternative (`cfg_proc/*.json`, no CLI-flag list):
 q initFromCfg.q -config ../cfg_proc/rdb.json
 ```
 
-- `./scripts/startupAllByModule.sh <name>` - one module by name
-- `./scripts/startupAll.sh` - default pipeline + every module
-- `./scripts/startupAllWithGen.sh` - same, with synthetic data flowing via `generator.q`
+- `./scripts/startStop/startupAllByModule.sh <name>` - one module by name
+- `./scripts/startStop/startupAll.sh` - default pipeline + every module
+- `./scripts/startStop/startupAllWithGen.sh` - same, with synthetic data flowing via `generator.q`
 
 Each has a matching `shutdown*.sh`. A feed handler publishes into a TP with
 `` `upd `` (async, classic tick.q); a CEP subscribes the same way an RDB does
@@ -68,7 +72,7 @@ library + handler registrations) and, optionally, its own feed handler.
 \* `eod` is a one-shot batch job, not a persistent server. \*\* `report`
 has no tp/rdb/idb/hdb of its own. Every "rdb" cell is an active/standby
 pair sharing one `rdb.json`. Run a module with
-`./scripts/startupAllByModule.sh <name>`, or by hand in order
+`./scripts/startStop/startupAllByModule.sh <name>`, or by hand in order
 (`tp`&rarr;`cep`&rarr;`rdb -instance 1`&rarr;`rdb -instance 2`&rarr;`idb`&rarr;`hdb`)
 via `q initFromCfg.q -config ../cfg_proc/modules/<name>/<role>.json`.
 
@@ -100,10 +104,10 @@ spread cost, post-trade markout/impact, and financing fee/coverage.
 Symbol-only, not client-level.
 
 ```
-./scripts/startupAllByModule.sh spread
-./scripts/startupAllByModule.sh markout
-./scripts/startupAllByModule.sh primeFinance
-./scripts/startupAllByModule.sh report
+./scripts/startStop/startupAllByModule.sh spread
+./scripts/startStop/startupAllByModule.sh markout
+./scripts/startStop/startupAllByModule.sh primeFinance
+./scripts/startStop/startupAllByModule.sh report
 q modules/analytics/spread/simulator.q
 q modules/analytics/markout/simulator.q
 q modules/analytics/primeFinance/simulator.q
@@ -176,9 +180,43 @@ q modules/backtest/run.q -sym aud_cad -sDate 2020.01.15 -eDate 2020.01.15 \
   -strategy momentum -portfolio confweighted -risk maxdd -ddLimit 0.02 -execution twap -phaseIn 5
 ```
 
+`modules/backtest/service.q` is `run.q`'s long-running counterpart - loads
+the same archive once, opens a port, and exposes `.bt.svc.run`/
+`.bt.svc.meta` over IPC so the dashboard's **eFX > Backtest** page (see
+`openDash/gateway/README.md`'s `/api/backtest` section) doesn't reload
+`C:/data/db1/efx` per request. Not a `cfg_proc/` module:
+
+```
+bash scripts/startStop/startupBacktest.sh   # port 5097, efxroot C:/data/db1/efx
+bash scripts/startStop/shutdownBacktest.sh
+```
+
+`.bt.svc.meta[]` (the symbol/date-range universe, 1768 symbols) is
+precomputed once at startup - a full-archive by-sym scan takes ~45s, so
+the service is unresponsive to *any* query (q is single-threaded) until
+that finishes; every later call is instant.
+
 `candle.q` (32 patterns, ported from third-party `kdb_candle`) needed
 several real fixes to run on this build at all (dyadic `max`/`min`,
 scalar-only `$[cond;a;b]`, reserved-word locals) - all verified empirically.
+
+`modules/analytics/candle/run.q` is a separate standalone scanner: pulls
+one real day of `eq_m1_yfinance` 1-minute bars over its gateway,
+aggregates to 10 timeframes (1m/5m/10m/15m/30m/1h/2h/4h/8h/1d), runs every
+pattern per symbol per timeframe (never a raw multi-symbol table - see the
+file header for why), and persists the results into its own dated
+`candlePattern` HDB root (`schemas/schema_candlepattern.q`):
+
+```
+q modules/analytics/candle/run.q -date 2026.09.03
+```
+
+`scripts/other/backfillCandlePattern.sh` runs it once per real trading
+date already in `eq_m1_yfinance`. `scripts/other/scheduleCandlePatternDaily.ps1`
+registers `scripts/other/runCandlePatternDaily.ps1` as a Windows Scheduled
+Task (`openQ_candlePattern_daily`, daily) so it runs on its own for
+"yesterday"; each run is tracked start/end/success in `mon`'s `jobStatus`
+table like any other job (see `modules/mon/jobStatus.q`).
 
 ## Monitoring & logging
 

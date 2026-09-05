@@ -93,8 +93,16 @@ system "l ../modules/analytics/markout/markOutImpact.q";
  .u.upd[t;x];
  };
 
-.oq.cep.addHandler[`trade;.markoutMod.onTrade;`markoutOnTrade];
-.oq.cep.addHandler[`order;.markoutMod.onOrder;`markoutOnOrder];
-.oq.cep.addHandler[`rate;.markoutMod.onRate;`markoutOnRate];
+// TEMPORARY (2026-09-05 ops incident, see openQ README/memory): NOT
+// registering onTrade/onOrder/onRate here for this one restart - .markout.pending
+// grows unbounded during a fast-forward replay of a multi-day backlog (eviction
+// is a real-wall-clock timer, .markoutMod.sweep, which barely fires while
+// replay races through days of message-time in seconds), and every rate tick
+// full-table-scans .markout.pending - a runaway CPU blowup once caught, not
+// caught before because the pre-existing .oq.cep.dispatch type bug made every
+// replayed row fail instantly. Re-registered by hand over IPC once this
+// restart's backlog replay is done and caught up to live - see the relevant
+// memory entry for the restore-to-normal command. Only .markoutMod.relay is
+// registered below, so rdb/idb/hdb still get the full backlog untouched.
 {.oq.cep.addHandler[x;.markoutMod.relay;`$"markoutRelay",string x]} each .oq.schema.tables[];
 .markoutMod.info.timer.sweep:.util.timer.add[.z.p+.markoutMod.sweepFreq;0Wp;.markoutMod.sweepFreq;`.markoutMod.sweep;`REL;"markout/impact pending sweep"];
