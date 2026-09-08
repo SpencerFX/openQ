@@ -1,34 +1,44 @@
 //====================================================================
-// Directory: modules/mon/eod_housekeeping.q
+// Directory: modules/analytics/primeFinance/eod_housekeeping.q
 //
 // About:
-// -hkscript for the mon module's housekeeping process: a wall-clock
-// timer that promotes each completed UTC day's `logs`/`pidstats` into
-// the real dated HDB partition (C:/data/db1/mon) by calling
-// .oq.idb.eod[dt] via IPC on the already-running mon idb (-idbaddr) -
-// final pivot-and-harvest, promote the day's segments, clear -idbroot so
-// the next day restarts at segment 0. Same mechanism eq_m1_yfinance's
-// housekeeping uses (modules/ingest/yfinance/q/eod_housekeeping.q); this is
-// the generic, table-agnostic version - it drives .oq.schema.tables[]
-// rather than naming a table, so nothing here is mon-specific beyond the
-// schema it loads.
+// -hkscript for the primeFinance module's housekeeping process: a
+// wall-clock timer that promotes each completed UTC day's inventory/
+// locate/position/borrow/recall rows into the real dated HDB partition
+// (see cfg_proc/modules/primefinance/hdb.json's hdbroot) by calling
+// .oq.idb.eod[dt] via IPC on the already-running primefinance idb
+// (-idbaddr) - final pivot-and-harvest, promote the day's segments,
+// clear -idbroot so the next day restarts at segment 0. Same mechanism
+// as modules/mon/eod_housekeeping.q (mon) and
+// modules/ingest/yfinance/q/eod_housekeeping.q (eq_m1_yfinance/
+// fx_m1_yfinance); this is the mon-shaped, multi-table variant - it
+// drives .oq.schema.tables[] rather than naming a single owned table,
+// since primeFinance's schema has 5 tables (inventory/locate/position/
+// borrow/recall), not the yfinance family's one-table-per-process split.
 //
-// Deliberately NOT the dashboard's "Run EOD" path (core/eod.q): that one
-// reads -idbroot's segments WITHOUT clearing them, so a long-running idb
-// that keeps pivoting into the same numbering sequence across a day
-// boundary would re-promote (duplicate) stale segments into the next
-// day's partition. .oq.idb.eod does pivot+read+promote+clear as one
-// atomic step inside the process that owns -idbroot and the rdb pair.
+// Trigger time: 30 minutes AFTER eq_m1_yfinance_housekeeping's own
+// -eodTriggerTime (08:30:00.000 UTC - see modules/ingest/yfinance/q/
+// eod_housekeeping.q's header: 30 min past HKEX's close, tuned so both
+// HKEX and Nikkei's full UTC trading day has landed). primeFinance's CEP
+// (modules/analytics/primeFinance/cep.q, .primeMod.market.refresh)
+// pulls real vol/ADV/close from eq_hdb - including eq_m1_yfinance's
+// HKEX/Nikkei bars - to build calibration/positionRisk/crowding/
+// exposure, so primeFinance's own day-close promotion is deliberately
+// sequenced to run only after that upstream HKEX savedown has already
+// landed in eq_hdb, not concurrently with it. Configured here as
+// -eodTriggerTime 09:00:00.000 (cfg_proc/modules/primefinance/
+// housekeeping.json) - update both together if eq_m1_yfinance's own
+// trigger time ever moves.
 //
-// Trigger semantics: the timer promotes the day that has just ENDED
-// (.z.d - 1), because by the time a post-midnight tick runs .z.d has
-// already rolled to the new day. -eodTriggerTime (default 00:00:00.000
-// UTC) is the earliest wall-clock time-of-day, on the day after the one
-// being promoted, at which the promote is allowed to fire - the default
-// means "first tick of each new UTC day promotes the day that closed".
-// Raise it only if you want to defer the roll to later in the morning;
-// do NOT set it near the end of the day or you would promote a day
-// that isn't over yet.
+// Trigger semantics: unlike mon's midnight-boundary trigger (which
+// promotes .z.d-1, the day that just ended, on the first post-midnight
+// tick), this fires mid-UTC-day - the target is .z.d + -eodDayOffset
+// (default 0 = "today"), matching eq_m1_yfinance's own same-day
+// promotion: by 09:00 UTC the UTC day in progress already has its full
+// HKEX/Nikkei session behind it, so "today" is the day to promote, not
+// yesterday. -eodDayOffset exists (optional CLP, default 0) purely so
+// this same script stays reusable if a future deployment ever needs a
+// different day target, mirroring the yfinance version's own knob.
 //
 // Idempotency is a marker FILE this script writes right after a
 // successful .oq.idb.eod call - kept under a NON-date-named sibling
@@ -39,7 +49,7 @@
 // "does the partition dir exist" check isn't safe: an idb/save cycle can
 // leave an empty dir behind well before a real promote.
 //====================================================================
-system "l ../schemas/schema_mon.q";
+system "l ../schemas/schema_primefinance.q";
 
 // jobStatus tracking for the scheduled EOD promote (.oq.hk.run). Same
 // best-effort contract as this file's own .util.log.ex calls: a process
@@ -55,6 +65,10 @@ system "l ../schemas/schema_mon.q";
 .oq.hk.idbAddr:`$.util.start.CLP[`idbaddr][`val];
 .oq.hk.hdbRoot:.util.core.toHsym .util.start.CLP[`hdbroot][`val];
 .oq.hk.eodTriggerTime:"T"$.util.start.CLP[`eodTriggerTime][`val];
+// -eodDayOffset is optional (absent from housekeeping.json today, so this
+// always resolves to 0 = promote .z.d); .oq.cfg.merge lands a JSON number
+// as a string, so "J"$ it back the same way the yfinance version does.
+.oq.hk.dayOffset:{o:@[{"J"$.util.start.CLP[`eodDayOffset][`val]};`;0N]; $[null o;0;o]}[];
 .oq.hk.idbH:0Ni;
 // set fresh by .oq.hk.run right before promote (below) reads it - promote
 // is a real niladic function so it can't see .oq.hk.run's own `target`
@@ -96,12 +110,12 @@ system "l ../schemas/schema_mon.q";
 //@desc
 //Second, independent safety check alongside .oq.hk.alreadyPromoted:
 //that one catches a date THIS script promoted; this one catches a date
-//something ELSE populated first (e.g. a manual mon_eod run, or a
-//restored partition). Without it, a scheduled .oq.idb.eod call for an
-//already-published date would fail .oq.save.publish's atomic rename.
-//When it fires, .oq.hk.run drops a marker so the date goes quiet rather
-//than being re-checked (and re-logged) every tick. Checks each table's
-//`sym column file - both mon schema tables carry one.
+//something ELSE populated first (e.g. a manual EOD run, or a restored
+//partition). Without it, a scheduled .oq.idb.eod call for an already-
+//published date would fail .oq.save.publish's atomic rename. When it
+//fires, .oq.hk.run drops a marker so the date goes quiet rather than
+//being re-checked (and re-logged) every tick. Checks each table's `sym
+//column file - all 5 primeFinance schema tables carry one.
 //@desc
 .oq.hk.hasForeignData:{[dt]
  any {[dt;t]
@@ -114,52 +128,37 @@ system "l ../schemas/schema_mon.q";
 //@desc
 //Timer callback (registered on -hkfreq by .oq.hk.init, core/housekeeping.q).
 //A no-op every tick except the first, each UTC day, once time-of-day has
-//passed -eodTriggerTime and the day that just ended (.z.d - 1) isn't
+//passed -eodTriggerTime and the target day (.z.d + -eodDayOffset) isn't
 //already promoted / already populated - then calls .oq.idb.eod[target]
-//on the live mon idb (-idbaddr) and, only once that returns without
-//error, writes target's marker file.
+//on the live primefinance idb (-idbaddr) and, only once that returns
+//without error, writes target's marker file.
 //@desc
 .oq.hk.run:{[]
- target:.z.d-1;
+ target:.z.d+.oq.hk.dayOffset;
  if[(`time$.z.p)<.oq.hk.eodTriggerTime;:(::)];
  if[.oq.hk.alreadyPromoted[target];:(::)];
  if[.oq.hk.hasForeignData[target];
-   .util.log.ex[`INFO;`.oq.hk.run]"Scheduled EOD for ",(string target)," not needed: its mon partition already has data (e.g. a manual mon_eod run) - marking done, not overwriting.";
+   .util.log.ex[`INFO;`.oq.hk.run]"Scheduled EOD for ",(string target)," not needed: its primefinance partition already has data (e.g. a manual EOD run) - marking done, not overwriting.";
    @[{[dt] .oq.hk.markerFile[dt] set ()};target;{[e].util.log.ex[`WARN;`.oq.hk.run]"Failed to write skip-marker: ",e}];
    :(::)];
  .oq.hk.eodConnect[];
  if[null .oq.hk.idbH;:(::)];
  // the promote + marker write, as one niladic unit so .mon.job.run can
  // wrap it (RUNNING row on entry, SUCCESS/FAILED on exit -> the mon
- // `jobStatus` table -> the dashboard's JobStatus page). A signal from
- // here (idb returned `FAILED, or the marker write threw) leaves no
- // marker file, so the next tick retries the whole promote - unchanged
- // from before jobStatus tracking. jobStatus.q absent => run it plain.
- //
- // target has to reach promote via a real GLOBAL (.oq.hk.priv.target),
- // not a closure read of .oq.hk.run's own local - confirmed the hard way:
- // the previous version wrote `promote[target]` intending a deferred,
- // bound projection, but promote has exactly one parameter and this
- // supplies exactly one argument, so it's a full, IMMEDIATE call, not a
- // projection - it ran (and could throw) while still constructing @'s own
- // argument, before @'s trap even existed, turning the intended
- // `@[f;x;errFn]` protected-call form into plain 2-arg indexing with no
- // protection at all. Confirmed live: a stale .oq.hk.idbH handle threw
- // `target then `type, uncaught by this function's own handler below,
- // visible only as repeated (per-minute, ~2h) .util.timer.run-level noise
- // in the mon `logs` table instead of one clean "Scheduled EOD failed"
- // line - and .mon.job.run never got to wrap the real work at all, since
- // it had already finished (or failed) before .mon.job.run was even
- // called. promote is genuinely niladic now, passed as a plain function
- // VALUE (no brackets - not calling it), so `f[]` inside the wrapper is
- // the only place it actually runs, safely inside @'s protection.
+ // `jobStatus` table -> the dashboard's JobStatus page). target reaches
+ // promote via a real GLOBAL (.oq.hk.priv.target), not a closure read of
+ // .oq.hk.run's own local - promote has to be genuinely niladic (passed
+ // as a plain function VALUE below, no brackets) or `f[]` inside @'s
+ // wrapper is no longer the only place it runs, and the eager-call bug
+ // found (and fixed) in mon's own copy of this file reappears here too:
+ // see modules/mon/eod_housekeeping.q's .oq.hk.run for the full writeup.
  .oq.hk.priv.target:target;
  promote:{[]
    t:.oq.hk.priv.target;
    if[`FAILED~.oq.hk.idbH (`.oq.idb.eod;t);'"idb .oq.idb.eod returned `FAILED"];
    .oq.hk.markerFile[t] set ();
    };
- ok:@[{[f] $[`run in key `.mon.job;.mon.job.run[`mon_eod_housekeeping;f];f[]]; 1b};promote;
+ ok:@[{[f] $[`run in key `.mon.job;.mon.job.run[`primefinance_eod_housekeeping;f];f[]]; 1b};promote;
    {[e].util.log.ex[`ERROR;`.oq.hk.run]"Scheduled EOD failed: ",e;0b}];
  if[not ok;:(::)];
  .util.log.ex[`INFO;`.oq.hk.run]"Scheduled EOD triggered for ",string target;

@@ -1,0 +1,24 @@
+{
+  "procType": "housekeeping",
+  "name": "fx_m1_yfinance_housekeeping",
+  "port": 5122,
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "housekeeping.q"
+  ],
+  "params": {
+    "hkscript": "../modules/ingest/yfinance/q/eod_housekeeping.q",
+    "hkfreq": "0D00:01:00",
+    "idbaddr": ":localhost:5121",
+    "hdbroot": "C:/data/db1/efx",
+    "eodTriggerTime": "00:00:00.000",
+    "eodDayOffset": -1
+  }
+}

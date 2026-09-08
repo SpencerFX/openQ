@@ -58,9 +58,22 @@ class ExchangeSpec:
                                     # every venue currently shares eq_m1_yfinance
                                     # (distinguished by the `exchange column) -
                                     # override only to route one to its own table
+    exchange_value: str = ""        # value written to the kdb `exchange column;
+                                    # "" -> use `key (the usual case)
+    _to_sym: Optional[Callable[["ExchangeSpec", str], str]] = None
+    # maps a Yahoo ticker -> the symbol stored on disk (parquet filename / kdb
+    # `sym). None -> identity. Override to normalise, e.g. FX drops the "=X"
+    # so EURUSD=X is saved as EURUSD.
 
     def to_yahoo(self, code: str) -> str:
         return self._to_yahoo(self, code)
+
+    def to_sym(self, yahoo_ticker: str) -> str:
+        return yahoo_ticker if self._to_sym is None else self._to_sym(self, yahoo_ticker)
+
+    @property
+    def exch(self) -> str:
+        return self.exchange_value or self.key
 
     def build_universe(self, args=None) -> pd.DataFrame:
         df = self._universe(self, args)
@@ -90,6 +103,12 @@ def _yahoo_plain(spec: ExchangeSpec, code: str) -> str:
 
 def _yahoo_suffix_only(spec: ExchangeSpec, code: str) -> str:
     return str(code).strip().upper() + spec.yahoo_suffix
+
+
+def _sym_drop_suffix_x(spec: ExchangeSpec, yahoo_ticker: str) -> str:
+    # Yahoo FX spot tickers are "<PAIR>=X" (EURUSD=X); store the bare pair.
+    t = str(yahoo_ticker).strip()
+    return t[:-2] if t.upper().endswith("=X") else t
 
 
 # --------------------------------------------------------------------------- #
@@ -294,23 +313,51 @@ def _universe_us_futures(spec: ExchangeSpec, args) -> pd.DataFrame:
     )
 
 
-# A third fixed list: the standard "major" FX spot pairs - the most heavily
-# traded pairs, all quoted against USD. Not downloadable - the list IS the
-# universe, same reasoning as the rate indices above.
-_FX_MAJORS = [
-    ("EURUSD=X", "Euro / US Dollar"),
-    ("USDJPY=X", "US Dollar / Japanese Yen"),
-    ("GBPUSD=X", "British Pound / US Dollar"),
-    ("USDCHF=X", "US Dollar / Swiss Franc"),
-    ("USDCAD=X", "US Dollar / Canadian Dollar"),
-    ("AUDUSD=X", "Australian Dollar / US Dollar"),
-    ("NZDUSD=X", "New Zealand Dollar / US Dollar"),
+# A third fixed list: the standard FX spot desk universe - the seven USD
+# majors plus the liquid G10 crosses. Not downloadable - the list IS the
+# universe, same reasoning as the rate indices above. Yahoo ticker is
+# "<PAIR>=X"; the "=X" is dropped for the stored `sym (spec._to_sym), so
+# EURUSD=X lands as `EURUSD.
+_FX_PAIRS = [
+    # USD majors
+    ("EURUSD=X", "major", "Euro / US Dollar"),
+    ("USDJPY=X", "major", "US Dollar / Japanese Yen"),
+    ("GBPUSD=X", "major", "British Pound / US Dollar"),
+    ("USDCHF=X", "major", "US Dollar / Swiss Franc"),
+    ("USDCAD=X", "major", "US Dollar / Canadian Dollar"),
+    ("AUDUSD=X", "major", "Australian Dollar / US Dollar"),
+    ("NZDUSD=X", "major", "New Zealand Dollar / US Dollar"),
+    # EUR crosses
+    ("EURGBP=X", "cross", "Euro / British Pound"),
+    ("EURJPY=X", "cross", "Euro / Japanese Yen"),
+    ("EURCHF=X", "cross", "Euro / Swiss Franc"),
+    ("EURAUD=X", "cross", "Euro / Australian Dollar"),
+    ("EURCAD=X", "cross", "Euro / Canadian Dollar"),
+    ("EURNZD=X", "cross", "Euro / New Zealand Dollar"),
+    # GBP crosses
+    ("GBPJPY=X", "cross", "British Pound / Japanese Yen"),
+    ("GBPCHF=X", "cross", "British Pound / Swiss Franc"),
+    ("GBPAUD=X", "cross", "British Pound / Australian Dollar"),
+    ("GBPCAD=X", "cross", "British Pound / Canadian Dollar"),
+    ("GBPNZD=X", "cross", "British Pound / New Zealand Dollar"),
+    # JPY crosses
+    ("CHFJPY=X", "cross", "Swiss Franc / Japanese Yen"),
+    ("CADJPY=X", "cross", "Canadian Dollar / Japanese Yen"),
+    ("AUDJPY=X", "cross", "Australian Dollar / Japanese Yen"),
+    ("NZDJPY=X", "cross", "New Zealand Dollar / Japanese Yen"),
+    # other G10 crosses
+    ("AUDNZD=X", "cross", "Australian Dollar / New Zealand Dollar"),
+    ("AUDCAD=X", "cross", "Australian Dollar / Canadian Dollar"),
+    ("AUDCHF=X", "cross", "Australian Dollar / Swiss Franc"),
+    ("NZDCAD=X", "cross", "New Zealand Dollar / Canadian Dollar"),
+    ("NZDCHF=X", "cross", "New Zealand Dollar / Swiss Franc"),
+    ("CADCHF=X", "cross", "Canadian Dollar / Swiss Franc"),
 ]
 
 
-def _universe_fx_majors(spec: ExchangeSpec, args) -> pd.DataFrame:
+def _universe_fx(spec: ExchangeSpec, args) -> pd.DataFrame:
     return pd.DataFrame(
-        [{"ticker": t, "code": t, "name": n} for t, n in _FX_MAJORS]
+        [{"ticker": t, "code": spec.to_sym(t), "group": g, "name": n} for t, g, n in _FX_PAIRS]
     )
 
 
@@ -363,17 +410,18 @@ EXCHANGES: dict[str, ExchangeSpec] = {
         _to_yahoo=_yahoo_suffix_only, _universe=_universe_us_futures,
         table="futures_m1_yfinance",
     ),
-    # Not a venue: the standard major FX spot pairs (EURUSD, USDJPY, GBPUSD,
-    # USDCHF, USDCAD, AUDUSD, NZDUSD), all quoted against USD. Own table
-    # fx_m1_yfinance; `exchange column = fx. FX trades ~24h/weekday (Sun 5pm
-    # ET open to Fri 5pm ET close) so the poll window is wide, same caveat as
+    # Not a venue: FX spot - the 7 USD majors + liquid G10 crosses. Own table
+    # fx_m1_yfinance; `exchange column = `yfinance (not `fx - a source tag, set
+    # via exchange_value). Yahoo ticker "<PAIR>=X"; stored `sym drops the "=X"
+    # (_to_sym), so EURUSD=X -> `EURUSD. FX trades ~24h/weekday (Sun 5pm ET
+    # open to Fri 5pm ET close) so the poll window is wide, same caveat as
     # futures - the weekday check still applies and misses the Sunday-evening
     # reopen; use --no-session for that.
     "fx": ExchangeSpec(
-        key="fx", name="FX spot (major pairs)", tz="America/New_York",
+        key="fx", name="FX spot (majors + G10 crosses)", tz="America/New_York",
         poll_start=(0, 0), poll_end=(23, 59), yahoo_suffix="",
-        _to_yahoo=_yahoo_suffix_only, _universe=_universe_fx_majors,
-        table="fx_m1_yfinance",
+        _to_yahoo=_yahoo_suffix_only, _universe=_universe_fx,
+        table="fx_m1_yfinance", exchange_value="yfinance", _to_sym=_sym_drop_suffix_x,
     ),
 }
 

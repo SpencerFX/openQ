@@ -146,6 +146,12 @@ system "l ../modules/analytics/report/deskRisk.q";
   hclose ph;
   .report.latest:.deskRisk.report[d];
   .util.log.ex[`INFO;`.report.refresh]"Desk risk report refreshed: ",(string count .report.latest)," symbol(s)";
+  // each refresh reads the whole day's staged rows off disk, deenums them
+  // (full column-wise copy) and runs .markout.calc/.impact.calc over a
+  // trade x grid cross aj'd against the full rate history - transient GBs
+  // that q keeps as heap. Hand it straight back so RSS settles to ~the live
+  // working set between refreshes instead of parking at the daily peak.
+  .Q.gc[];
   };
 
 //@func   | .report.refreshSafe
@@ -159,7 +165,23 @@ system "l ../modules/analytics/report/deskRisk.q";
   impactBp:`float$(); financingFeeBp:`float$(); shortQty:`long$();
   locatedQty:`long$(); coverage:`float$(); bucket:`symbol$());
 
-.report.info.timer.refresh:.util.timer.add[.z.p;0Wp;0D00:01:00;`.report.refreshSafe;`REL;"desk risk report refresh"];
+// How often .report.refreshSafe recomputes the report. Resolution order:
+//   -reportFreq (CLI flag / cfg_proc params, registered in core/config.q)
+//   OPENQ_REPORT_FREQ env
+//   0D00:05:00 default
+// Each refresh is a full-day batch recompute (transient GBs), so a tight
+// interval just burns CPU and heap for a point-in-time risk view. A value
+// that doesn't parse as a timespan falls back to the default rather than
+// registering a 0Nn (never-fires) or 0 (tight-loop) timer.
+.report.refreshFreq:{[]
+  cand:.util.start.CLP[`reportFreq][`val];
+  if[0=count cand; cand:getenv `OPENQ_REPORT_FREQ];
+  f:@[{"N"$x};cand;0Nn];
+  $[(null f) or f<=0D00:00:01; 0D00:05:00; f]
+ }[];
+.util.log.ex[`INFO;`report]"Desk risk refresh interval: ",string .report.refreshFreq;
+
+.report.info.timer.refresh:.util.timer.add[.z.p;0Wp;.report.refreshFreq;`.report.refreshSafe;`REL;"desk risk report refresh"];
 
 // run once immediately at startup too, so there's real data without
 // waiting a full minute for the first timer tick

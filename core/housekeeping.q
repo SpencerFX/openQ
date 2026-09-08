@@ -143,8 +143,8 @@
 //@param  | tab | symbol
 //@desc
 // (rowCount;firstTime;lastTime) for one (table,date) partition, by
-// reading just the `timestamp` column's file directly off disk (every
-// openQ table's guaranteed-present first column) - min/max come for
+// reading just the `timestamp` column's file directly off disk (most
+// openQ tables' guaranteed-present first column) - min/max come for
 // free as first/last, since a partition's timestamp column is written
 // sorted ascending by construction. This is the one read
 // .oq.hk.scanHDB does per partition, reused for BOTH that date's own
@@ -156,13 +156,26 @@
 // this also means .oq.hk.scanHDB never needs to `system"l"` the whole
 // hdbroot into memory at all. (0;0Np;0Np) if the partition doesn't
 // exist or is empty.
+//
+// A daily-bar table (fx_d1_yfinance and its futures/rates siblings) has
+// no `timestamp` column at all - it's keyed on `date alone. Fall back to
+// counting the partition's FIRST splayed column (from .d) for the row
+// count, and to `barTime for first/last if that column happens to be
+// present; otherwise the times are genuinely null (a daily bar has no
+// intra-day time).
 //@desc
 .oq.hk.priv.partitionStats:{[root;d;tab]
-  tsFile:` sv (root;`$string d;tab;`timestamp);
-  if[not count key tsFile;:(0j;0Np;0Np)];
-  ts:get tsFile;
-  n:count ts;
-  $[n>0;(n;first ts;last ts);(0j;0Np;0Np)]
+  pdir:` sv (root;`$string d;tab);
+  if[not count key pdir;:(0j;0Np;0Np)];
+  tsFile:` sv (pdir;`timestamp);
+  if[count key tsFile;
+    ts:get tsFile; n:count ts;
+    :$[n>0;(n;first ts;last ts);(0j;0Np;0Np)]];
+  dcols:@[get;` sv (pdir;`.d);`symbol$()];
+  if[not count dcols;:(0j;0Np;0Np)];
+  n:count @[get;` sv (pdir;first dcols);()];
+  bt:$[`barTime in dcols;@[get;` sv (pdir;`barTime);0#0Np];0#0Np];
+  $[n>0;(n;$[count bt;first bt;0Np];$[count bt;last bt;0Np]);(0j;0Np;0Np)]
  };
 
 //@func  | .oq.hk.scanHDB

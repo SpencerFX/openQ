@@ -66,7 +66,7 @@ library + handler registrations) and, optionally, its own feed handler.
 | `markout` | 5030 tp, 5031/5102 rdb, 5032 idb, 5033 hdb, 5034 cep, 5067 eod\* | `schema_markout.q` | Trade markout / order impact via `markOutImpact.q` |
 | `massive` | 5018 fh, 5045 tp, 5049 cep, 5046/5105 rdb, 5047 idb, 5048 hdb, 5068 eod\* | `schema_efx.q` | Real vendor FX WebSocket feed &rarr; `fx_tick_massive`/`fx_m1_massive` |
 | `spread` | 5055 tp, 5056/5103 rdb, 5057 idb, 5058 hdb, 5059 cep, 5069 eod\* | `schema_spread.q` | FX spread build-up/attribution via `spread.q` |
-| `primeFinance` | 5070 tp, 5071/5104 rdb, 5072 idb, 5075 hdb, 5074 cep, 5076 eod\* | `schema_primefinance.q` | Securities-lending inventory/locate/borrow/recall/exposure |
+| `primeFinance` | 5070 tp, 5071/5104 rdb, 5072 idb, 5075 hdb, 5074 cep, 5076 eod\*, 5106 hk | `schema_primefinance.q` | Securities-lending inventory/locate/borrow/recall/exposure |
 | `report` | 5080 cep only\*\* | none | Unifies spread+markout+primeFinance into one Desk Risk & TCA view |
 
 \* `eod` is a one-shot batch job, not a persistent server. \*\* `report`
@@ -79,10 +79,14 @@ via `q initFromCfg.q -config ../cfg_proc/modules/<name>/<role>.json`.
 **`eod`** (`core/eod.q`) reads whatever `idb` has segmented to disk
 (`-idbroot`) and promotes it into the dated HDB partition - a manual,
 one-shot step, run only after `idb`'s final pivot for the day and never
-twice for the same date. Two modules automate it via a `housekeeping`
-process instead (`-hkscript` + `-hkfreq`): `eq_m1_yfinance` (08:30 UTC)
-and `mon` (00:00 UTC), both calling `.oq.idb.eod[dt]` on the live `idb`
-and gating on a marker file so a restart can't double-promote.
+twice for the same date. Three modules automate it via a `housekeeping`
+process instead (`-hkscript` + `-hkfreq`): `eq_m1_yfinance` (08:30 UTC),
+`mon` (00:00 UTC), and `primeFinance` (09:00 UTC - 30 min after
+`eq_m1_yfinance`'s own trigger, since primeFinance's CEP pulls real
+HKEX/Nikkei market data from `eq_hdb` and its own day-close is
+deliberately sequenced to run only once that upstream savedown has
+landed), all calling `.oq.idb.eod[dt]` on the live `idb` and gating on a
+marker file so a restart can't double-promote.
 
 **`generator`** (`modules/utils/generator/generator.q`, no process role)
 generates type-correct random rows for any `schemas/schema_*.q`, schema-blind.

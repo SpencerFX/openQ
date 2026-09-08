@@ -252,10 +252,12 @@ def fetch_history(symbols, cad: Cadence, *, days: int = MAX_LOOKBACK_DAYS,
     return {s: pd.concat(v, ignore_index=True) for s, v in acc.items() if v}
 
 
-def fetch_today(tickers, batch_size: int = 40, log=None) -> pd.DataFrame:
+def fetch_today(tickers, batch_size: int = 40, log=None, sym_of=None) -> pd.DataFrame:
     """One poll of today's 1m bars for the universe -> long frame
-    [sym, barTime(naive UTC), open, high, low, close, volume]."""
+    [sym, barTime(naive UTC), open, high, low, close, volume]. sym_of maps a
+    Yahoo ticker to the stored `sym (default: identity)."""
     yf = _yf()
+    sym_of = sym_of or (lambda t: t)
     frames = []
     for batch in chunked(tickers, batch_size):
         try:
@@ -269,7 +271,7 @@ def fetch_today(tickers, batch_size: int = 40, log=None) -> pd.DataFrame:
             continue
         parts = split_batch(data, batch)
         for s in batch:
-            f = normalise(parts.get(s), M1, sym=s)
+            f = normalise(parts.get(s), M1, sym=sym_of(s))
             if not f.empty:
                 frames.append(f)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=M1.long_cols)

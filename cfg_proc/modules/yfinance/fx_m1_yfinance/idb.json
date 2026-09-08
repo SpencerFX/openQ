@@ -1,6 +1,7 @@
 {
-  "procType": "rdb",
-  "name": "fx_m1_yfinance_rdb",
+  "procType": "idb",
+  "name": "fx_m1_yfinance_idb",
+  "port": 5121,
   "schema": "../schemas/schema_yfinance.q",
   "utilities": [
     "utils/timer.q",
@@ -11,16 +12,14 @@
     "utils/perm.q"
   ],
   "libraries": [
-    "rdb.q",
-    "utils/gateway.q",
-    "query.q",
-    "save.q"
+    "save.q",
+    "idb.q"
   ],
   "params": {
-    "tpaddr": ":localhost:5140",
+    "rdbaddr": ":localhost:5141",
+    "rdbaddr2": ":localhost:5120",
+    "idbroot": "../examples/data/fx_m1_yfinance/idb_staging",
     "hdbroot": "C:/data/db1/efx",
-    "port1": 5141,
-    "port2": 5120,
-    "instance": 1
+    "checkpointfreq": "0D00:15:00"
   }
 }
