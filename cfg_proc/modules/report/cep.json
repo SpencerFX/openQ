@@ -19,6 +19,7 @@
     "srcaddr": ":localhost:5074",
     "cepscript": "../modules/analytics/report/cep.q",
     "tplogdir": "",
-    "bmode": 0
+    "bmode": 0,
+    "reportFreq": "0D00:05:00"
   }
 }

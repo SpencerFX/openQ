@@ -18,8 +18,10 @@
 //                             cash equities - ONE table, venue in `exchange
 //     futures_m1_yfinance     CME/ICE US continuous front-month "=F" futures
 //     rateIndices_m1_yfinance CBOE UST yield indices ^IRX/^FVX/^TNX/^TYX
-//     fx_m1_yfinance          major FX spot pairs (EURUSD, USDJPY, GBPUSD,
-//                             USDCHF, USDCAD, AUDUSD, NZDUSD)
+//     fx_m1_yfinance          FX spot - 7 USD majors + 21 G10 crosses.
+//                             Yahoo ticker "<PAIR>=X" is stored bare
+//                             (`EURUSD, not `EURUSD=X); `exchange = `yfinance
+//                             (a source tag - set via ExchangeSpec.exchange_value)
 //
 //   DAILY bars   (PURE date-partitioned, NO `timestamp column - the
 //   partition dir IS the trading day; HDB-only, never through a
@@ -75,11 +77,22 @@
 //     "EFX HDB integration" note in openq_core_build (memory)). This is
 //     a deliberate departure from that archive's original "openQ never
 //     writes here" invariant, made knowingly at the user's explicit
-//     choice after being flagged: fx_m1_yfinance's tp/rdb now write into
-//     the same root on every EOD, and the first real load there will pay
-//     a one-time .Q.chk stub pass across efx's ~5,375 partitions (2009->).
-//     No data has been loaded into efx under this config yet as of the
-//     migration - fx currently has zero rows anywhere.
+//     choice after being flagged: fx_m1_yfinance's tp/rdb/idb now write
+//     into the same root on every EOD. Loaded 2026-09-06 (py/to_kdb.py
+//     --exchange fx --cadence {d1,m1} --db C:/data/db1/efx): fx_d1_yfinance
+//     121,593 rows / 28 pairs / 2010.01.01-> ; fx_m1_yfinance 765,266 rows
+//     / 28 pairs / ~28d (Yahoo's 1m FX limit). The first d1 load paid the
+//     one-time .Q.chk stub pass across efx's ~5,375 partitions; the vendor
+//     fx_*_massive / fx_*_dukasCopy tables were verified untouched.
+//     2026-09-06: fx_m1_yfinance was given the SAME full live pipeline as
+//     eq_m1_yfinance - tp/rdb/idb/hdb/gw/housekeeping (cfg_proc/modules/
+//     yfinance/fx_m1_yfinance/, ports 5140-5143 + a 5120-5123 rdb2 bank) -
+//     so, once its feed.py --sink tp is running, the housekeeping process
+//     rolls each UTC day into efx automatically via .oq.idb.eod, exactly
+//     like eq. Its -hkscript is the SHARED modules/ingest/yfinance/q/
+//     eod_housekeeping.q (no longer eq-only: it drives .oq.schema.tables[]
+//     off -name, and takes -eodDayOffset -1 for fx's 24x5 "promote the day
+//     that just closed" vs eq's 0 / "promote .z.d").
 //
 // Why this is the ONLY procType/-name-aware schema_*.q
 // ---------------------------------------------------

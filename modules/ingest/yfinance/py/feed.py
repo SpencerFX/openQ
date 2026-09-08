@@ -87,7 +87,7 @@ def run(sink, tickers, spec, tzinfo, interval, batch_size, enforce_session, once
             log.info("iter %d: outside %s session (%s) - idling",
                      it, spec.key, now_local.strftime("%a %H:%M %Z"))
         else:
-            fresh = completed_new(fetch_today(tickers, batch_size, log), last_pub)
+            fresh = completed_new(fetch_today(tickers, batch_size, log, spec.to_sym), last_pub)
             if len(fresh):
                 sink.write(fresh)
                 for s, g in fresh.groupby("sym"):
@@ -127,7 +127,7 @@ def main(argv=None) -> None:
     log.info("loaded %d %s tickers from %s", len(tickers), spec.key, tickers_path)
 
     sink = make_sink(args.sink, csv_dir=Path(args.csv_dir), host=args.host, port=args.port,
-                     exchange=spec.key, table=spec.table)
+                     exchange=spec.exch, table=spec.table)
     try:
         run(sink, tickers, spec, tzinfo, args.interval, args.batch_size,
             not args.no_session, once=args.once)

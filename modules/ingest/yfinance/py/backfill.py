@@ -60,7 +60,7 @@ def main(argv=None) -> None:
 
     symbols = load_tickers(tickers_path, args.max_symbols)
     if args.resume:
-        symbols = [s for s in symbols if not (out_dir / f"{s}.parquet").exists()]
+        symbols = [s for s in symbols if not (out_dir / f"{spec.to_sym(s)}.parquet").exists()]
     span = (("from " + args.start) if args.start else "period=max") if cad.name == "d1" \
         else f"{min(args.days, MAX_LOOKBACK_DAYS)}d"
     print(f"[{now_hms()}] {spec.key}/{cad.name}: {len(symbols)} symbols "
@@ -72,8 +72,8 @@ def main(argv=None) -> None:
     hist = fetch_history(symbols, cad, days=args.days, start=args.start, end=args.end,
                          batch_size=args.batch_size, sleep=args.sleep)
     total = got = 0
-    for sym, frame in hist.items():
-        n = merge_write(out_dir / f"{sym}.parquet", frame, cad)
+    for ticker, frame in hist.items():
+        n = merge_write(out_dir / f"{spec.to_sym(ticker)}.parquet", frame, cad)
         total += n
         got += bool(n)
     print(f"[{now_hms()}] wrote {total:,} bar-rows across {got} symbols -> {out_dir}")

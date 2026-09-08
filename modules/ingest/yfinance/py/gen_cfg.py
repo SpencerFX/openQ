@@ -4,8 +4,8 @@ modules/ingest/yfinance/py/gen_cfg.py
 
 Generates the flat cfg_proc/modules/yfinance/<name>/*.json files
 core/initFromCfg.q reads, from one compact manifest below, instead of
-five modules' worth of hand-typed, hand-synced JSON. Source of truth for
-those 14 files - see cfg_proc/modules/README.md; don't hand-edit them.
+seven modules' worth of hand-typed, hand-synced JSON. Source of truth for
+those 21 files - see cfg_proc/modules/README.md; don't hand-edit them.
 
 Why a generator and not a runtime "extends" mechanism: core/initFromCfg.q
 and the JSON files it reads don't change AT ALL - this only changes how
@@ -17,7 +17,7 @@ from the two numbers MODULES below actually needs to pin: a module's own
 tp_port (or, for a daily-only module with no tp/rdb, its hdb_port) and
 rdb2_port (the standby rdb / "secondary bank" base).
 
-Offsets below were reverse-engineered from the 19 real files already
+Offsets below were reverse-engineered from the real files already
 checked into cfg_proc/modules/yfinance/*/ and verified byte-identical
 against every one of them (see verify() at the bottom):
   rdb1        = tp_port + 1
@@ -66,10 +66,27 @@ MODULES = {
         hdbroot="C:/data/db1/rates",  # own root, shared w/ rateIndices_d1 -
     ),                                # see schema_yfinance.q's header
     "fx_m1_yfinance": dict(
-        roles=["tp", "rdb", "hdb"],
-        tp_port=5140, rdb2_port=5138,
+        # full live pipeline + daily EOD promote, exactly like eq_m1_yfinance
+        # (2026-09-06). rdb2_port moved 5138 -> 5120: adding idb/gw/housekeeping
+        # needs a 4-wide free block for the rdb2 bank (rdb2/idb/hk/gw), and
+        # 5138+2/+3 would have collided with tp(5140)/rdb1(5141). 5120-5123
+        # sits in the same free 512x range as eq's 5116-5119 bank.
+        roles=["tp", "rdb", "hdb", "idb", "gw", "housekeeping"],
+        tp_port=5140, rdb2_port=5120,
         hdbroot="C:/data/db1/efx",  # shares the read-only vendor FX archive's
-    ),                              # root (2026-09-05) - see schema_yfinance.q
+                                    # root (2026-09-05) - see schema_yfinance.q
+        hkscript="../modules/ingest/yfinance/q/eod_housekeeping.q",
+        # FX trades ~24x5, so - unlike eq, whose HKEX/Tokyo bars are all in
+        # by 08:30 UTC - there is no time-of-day before 24:00 UTC when
+        # "today" is done. eodDayOffset=-1 promotes the UTC day that just
+        # CLOSED; eodTriggerTime=00:00:00 means the first housekeeping tick
+        # of each new UTC day rolls the day that just ended (same setting
+        # and intent as modules/mon/ - "EOD at 00:00:00 UTC"). No buffer
+        # past midnight: the FX day genuinely ends at the UTC boundary.
+        # See eod_housekeeping.q's header.
+        eodTriggerTime="00:00:00.000",
+        eodDayOffset=-1,
+    ),
     "futures_d1_yfinance": dict(
         roles=["hdb"], hdb_port=5089,
         hdbroot="C:/data/db1/futures",
@@ -164,14 +181,20 @@ def build_gw(m, cfg, d):
 
 
 def build_housekeeping(m, cfg, d):
+    params = {
+        "hkscript": cfg["hkscript"], "hkfreq": "0D00:01:00",
+        "idbaddr": addr(d["idb_port"]), "hdbroot": cfg["hdbroot"],
+        "eodTriggerTime": cfg["eodTriggerTime"],
+    }
+    # eod_housekeeping.q defaults the promote day to .z.d (offset 0, eq's
+    # HKEX/Tokyo case); only emit the key for a module that needs another
+    # day, e.g. fx's -1 (promote the UTC day that just closed).
+    if cfg.get("eodDayOffset", 0):
+        params["eodDayOffset"] = cfg["eodDayOffset"]
     return {
         "procType": "housekeeping", "name": f"{m}_housekeeping", "port": d["hk_port"],
         "utilities": UTILITIES, "libraries": ["housekeeping.q"],
-        "params": {
-            "hkscript": cfg["hkscript"], "hkfreq": "0D00:01:00",
-            "idbaddr": addr(d["idb_port"]), "hdbroot": cfg["hdbroot"],
-            "eodTriggerTime": cfg["eodTriggerTime"],
-        },
+        "params": params,
     }
 
 

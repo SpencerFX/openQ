@@ -66,7 +66,7 @@ def main(argv=None) -> None:
     stage_dir.mkdir(parents=True, exist_ok=True)
     csv_path = stage_dir / f"{table}_{spec.key}_{datetime.now():%Y%m%d_%H%M%S}.csv"
 
-    files, rows = stream_parquet_dir(hist_dir, csv_path, cad, spec.key)
+    files, rows = stream_parquet_dir(hist_dir, csv_path, cad, spec.exch)
     mb = csv_path.stat().st_size / 1e6
     print(f"[{now_hms()}] staged {rows:,} rows from {files} files ({mb:.0f} MB) "
           f"-> {csv_path}  (table {table})")

@@ -62,6 +62,16 @@
 .impact.pending:([orderID:`long$(); offsetIdx:`int$()] sym:`symbol$(); side:`symbol$(); targetTime:`timestamp$(); orderRate:`float$());
 .impact.completed:([orderID:`long$(); offsetIdx:`int$()] offsetSec:`float$(); mid:`float$(); impact:`float$(); matchedTime:`timestamp$());
 
+// message-time frontier: the newest event time seen on the incremental
+// (onTrade/onRate/onOrder/onBook) path. Pending-row eviction is driven off
+// THIS, not wall-clock .z.p - so a fast-forward replay (message time
+// advancing days per wall-clock second, the periodic .z.p sweep barely
+// firing) still bounds .markout.pending / .impact.pending instead of
+// letting every onRate scan a table that only grows: the 2026-09-05 CPU
+// runaway. Monotonic non-decreasing; 0Np until the first event.
+.markout.msgTime:0Np;
+.impact.msgTime:0Np;
+
 //--------------------------------------------------------------------
 // time grids
 //--------------------------------------------------------------------
@@ -148,10 +158,12 @@
 // call on every new trade: register all offsets as pending
 //@desc
 .markout.onTrade:{[tr]
+  .markout.msgTime:.markout.msgTime | tr`tradeTime;
   n:count .markout.gridSecs;
   rows:([]tradeID:n#tr`tradeID; offsetIdx:til n;
     sym:n#tr`sym; targetTime:tr[`tradeTime]+.markout.gridNS; tradeRate:n#tr`tradeRate);
-  `.markout.pending upsert rows 
+  `.markout.pending upsert rows;
+  .markout.evictStale[]
  };
 
 //@func  | .markout.onRate
@@ -160,6 +172,7 @@
 // call on every new rate tick: complete any offsets now reachable
 //@desc
 .markout.onRate:{[rt]
+  .markout.msgTime:.markout.msgTime | rt`time;
   hits:0!select from .markout.pending where sym=rt`sym, targetTime<=rt`time;
   if[count hits;
     `.markout.completed upsert (cols .markout.completed)#update
@@ -168,12 +181,28 @@
       markoutVal:rt[`mid]-tradeRate,
       matchedTime:rt`time
       from hits;
-    delete from `.markout.pending where sym=rt`sym, targetTime<=rt`time]
+    delete from `.markout.pending where sym=rt`sym, targetTime<=rt`time];
+  .markout.evictStale[]
  };
 
 // how long a pending row may wait past its targetTime for a matching
 // rate tick before it's given up on as dead (feed gap / dead symbol)
 .markout.pendingTTL:0D00:05:00;
+
+//@func  | .markout.evictStale
+//@desc
+// drop pending rows whose targetTime is more than .markout.pendingTTL
+// behind the message-time frontier - a matching rate tick would have had
+// to arrive out of order by more than the TTL to still complete them, so
+// they're dead. Called on every incremental update (onTrade/onRate) so
+// .markout.pending stays bounded to roughly the last pendingTTL of trade
+// activity regardless of whether the wall-clock .markout.sweepPending
+// timer fires - which it barely does during a fast-forward replay.
+//@desc
+.markout.evictStale:{[]
+  if[null .markout.msgTime; :()];
+  delete from `.markout.pending where (.markout.msgTime-targetTime)>.markout.pendingTTL
+ };
 
 //@func  | .markout.sweepPending
 //@param  | now | timestamp
@@ -184,7 +213,7 @@
 // Call periodically (e.g. off a timer) alongside `.markout.onRate`.
 //@desc
 .markout.sweepPending:{[now]
-  delete from `.markout.pending where (now-targetTime)>.markout.pendingTTL
+  delete from `.markout.pending where ((now|.markout.msgTime)-targetTime)>.markout.pendingTTL
  };
 
 //--------------------------------------------------------------------
@@ -249,11 +278,13 @@
 // call on every new order: register all offsets as pending
 //@desc
 .impact.onOrder:{[ord]
+  .impact.msgTime:.impact.msgTime | ord`orderTime;
   n:count .impact.gridSecs;
   rows:([]orderID:n#ord`orderID; offsetIdx:til n;
     sym:n#ord`sym; side:n#ord`side;
     targetTime:ord[`orderTime]+.impact.gridNS; orderRate:n#ord`orderRate);
-  `.impact.pending upsert rows
+  `.impact.pending upsert rows;
+  .impact.evictStale[]
  };
 
 //@func  | .impact.onBook
@@ -262,6 +293,7 @@
 // call on every new book tick: complete any offsets now reachable
 //@desc
 .impact.onBook:{[bk]
+  .impact.msgTime:.impact.msgTime | bk`time;
   hits:0!select from .impact.pending where sym=bk`sym, targetTime<=bk`time;
   if[count hits;
     dirSign:?[hits[`side]=`buy;1f;-1f];
@@ -271,11 +303,24 @@
       impact:dirSign*(bk[`mid]-orderRate),
       matchedTime:bk`time
       from hits;
-    delete from `.impact.pending where sym=bk`sym, targetTime<=bk`time]
+    delete from `.impact.pending where sym=bk`sym, targetTime<=bk`time];
+  .impact.evictStale[]
  };
 
 // tighter TTL than markout's, matching .impact's tighter -10s/+60s grid
 .impact.pendingTTL:0D00:02:00;
+
+//@func  | .impact.evictStale
+//@desc
+// .markout.evictStale's counterpart for .impact.pending - drop rows more
+// than .impact.pendingTTL behind the message-time frontier, called on
+// every onOrder/onBook so pending stays bounded without depending on the
+// wall-clock sweep timer.
+//@desc
+.impact.evictStale:{[]
+  if[null .impact.msgTime; :()];
+  delete from `.impact.pending where (.impact.msgTime-targetTime)>.impact.pendingTTL
+ };
 
 //@func  | .impact.sweepPending
 //@param  | now | timestamp
@@ -286,6 +331,6 @@
 // Call periodically (e.g. off a timer) alongside `.impact.onBook`.
 //@desc
 .impact.sweepPending:{[now]
-  delete from `.impact.pending where (now-targetTime)>.impact.pendingTTL
+  delete from `.impact.pending where ((now|.impact.msgTime)-targetTime)>.impact.pendingTTL
  };
 //====================================================================
