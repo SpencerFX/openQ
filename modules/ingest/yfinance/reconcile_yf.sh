@@ -31,7 +31,7 @@ done
 
 if [ "$rc" = 0 ]; then
   echo "--- reload HDBs $(date -u) ---"
-  for p in $PORTS; do "C:/q/w64/q.exe" .reload_hdb.q "$p" || true; done
+  for p in $PORTS; do "C:/q/w64/q.exe" reloadHdb.q "$p" || true; done
 fi
 echo "=== reconcile_yf ${1:-} finished rc=$rc @ $(date -u) ==="
 exit $rc
