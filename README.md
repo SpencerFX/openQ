@@ -15,11 +15,13 @@ cfg_proc/         one JSON config per role/module, for initFromCfg.q -
                   the *_yfinance ones are generated, see cfg_proc/modules/README.md
 modules/analytics/<name>/  spread, markout, primeFinance, report - each
                   paired with its own cep.q/simulator.q; candle/ is a plain
-                  pattern library (no process role), used by backtest
+                  pattern library (no process role), used by backtest;
+                  brokerTech/ is batch analytics over an existing HDB (run.q)
 modules/backtest/ backtest.q engine, run.q
 modules/ingest/<name>/     feed-handler-fronted modules (massive,
-                  massive_stocks); modules/ingest/yfinance/ is a separate
-                  Python-only ingest, no cep.q - see its own README
+                  massive_stocks); modules/ingest/yfinance/ and
+                  modules/ingest/calendar/ are separate Python-only
+                  ingests, no cep.q - see their own READMEs
 modules/utils/<name>/      generator, hdb2tplog, replay - standalone libs
 scripts/qcon/      remote console (qcon.q + its .sh/.ps1 launchers)
 scripts/startStop/ start/stop the platform (startup.sh/startupAll*.sh + shutdown*.sh)
@@ -68,9 +70,15 @@ library + handler registrations) and, optionally, its own feed handler.
 | `spread` | 5055 tp, 5056/5103 rdb, 5057 idb, 5058 hdb, 5059 cep, 5069 eod\* | `schema_spread.q` | FX spread build-up/attribution via `spread.q` |
 | `primeFinance` | 5070 tp, 5071/5104 rdb, 5072 idb, 5075 hdb, 5074 cep, 5076 eod\*, 5106 hk | `schema_primefinance.q` | Securities-lending inventory/locate/borrow/recall/exposure |
 | `report` | 5080 cep only\*\* | none | Unifies spread+markout+primeFinance into one Desk Risk & TCA view |
+| `brokerTech` | 5077 hdb only\*\*\* | `schema_retail.q` | Retail FX/CFD brokerage & risk analytics (batch, over an existing HDB) - see "Retail brokerage analytics" |
+| `calendar` | 5078 hdb only\*\*\*\* | `schema_calendar.q` | fxStreet economic-calendar archive (batch ingest, own HDB) - see "Economic calendar" |
 
 \* `eod` is a one-shot batch job, not a persistent server. \*\* `report`
-has no tp/rdb/idb/hdb of its own. Every "rdb" cell is an active/standby
+has no tp/rdb/idb/hdb of its own. \*\*\* `brokerTech`'s analytics are a
+batch script (`run.q`); the `hdb` process just fronts the read-only
+archive for gateway queries. \*\*\*\* `calendar` has no analytics library
+of its own (yet) - `modules/ingest/calendar/` writes the archive,
+`hdb` just fronts it. Every "rdb" cell is an active/standby
 pair sharing one `rdb.json`. Run a module with
 `./scripts/startStop/startupAllByModule.sh <name>`, or by hand in order
 (`tp`&rarr;`cep`&rarr;`rdb -instance 1`&rarr;`rdb -instance 2`&rarr;`idb`&rarr;`hdb`)
@@ -157,7 +165,9 @@ a build with WebSocket support the same code just works, no changes needed.
 
 Read-only by construction - nothing under `core/` writes to an `-hdbroot`
 unless an `rdb`/`idb` process is explicitly pointed at it. `schema_efx.q`
-is a working example against a real, large on-disk EFX tick/bar archive.
+is a working example against a real, large on-disk EFX tick/bar archive;
+`schema_retail.q` is a second one, against a retail-brokerage
+copy-trading archive (see "Retail brokerage analytics").
 
 ## Backtesting
 
@@ -221,6 +231,71 @@ registers `scripts/other/runCandlePatternDaily.ps1` as a Windows Scheduled
 Task (`openQ_candlePattern_daily`, daily) so it runs on its own for
 "yesterday"; each run is tracked start/end/success in `mon`'s `jobStatus`
 table like any other job (see `modules/mon/jobStatus.q`).
+
+## Retail brokerage analytics
+
+`modules/analytics/brokerTech/` runs FX/CFD broker risk-desk analytics
+over an existing retail copy-trading HDB (`C:/data/retail`,
+`schema_retail.q` - a MetaTrader "Signals" dataset: per-provider trade
+blotters, intraday equity curves, monthly returns). Pure batch, same
+shape as Backtesting - `brokerTech.q` is a library of table-in/table-out
+functions, `run.q` loads the archive read-only and prints the report.
+The analytics mirror what a platform like [tapaas.com](https://www.tapaas.com/)
+does: exposure & concentration (`.brk.expo.*`), execution quality &
+cancel/quote-stuffing behaviour (`.brk.exec.*`), per-provider
+profitability & drawdown (`.brk.perf.*`), toxic-trader scoring
+(`.brk.tox.*` - scalp / martingale / one-sided / burst / "too good"),
+A-book vs B-book routing with a book-level optimisation headline
+(`.brk.book.*`), instrument-level revenue attribution (`.brk.rev.*`),
+and risk-threshold breach alerts (`.brk.alert.*`, same row shape as
+primeFinance's `.prime.alerts`). `.brk.broker.*` rolls all of it up
+**per brokerage**, with the broker parsed from `sig.name` (the archive
+has no broker field; providers that name none land in `UNKNOWN`). Every
+score is a deterministic formula with the knobs in `.brk.cfg`.
+`modules/analytics/brokerTech/predictive.q` adds a forward-looking
+layer on top - an equity-trend projection, a toxicity early-warning
+trend, a backtested toxScore -> blowup-rate calibration (trained on the
+window's first half, scored on its second), and a revenue forecast
+graded with its own walk-forward accuracy. See its own README section
+for what "backtested" means here and an honest finding about where the
+calibration's signal is thin.
+
+```
+q modules/analytics/brokerTech/run.q [-lookbackDays 180] [-top 15] \
+  [-minTrades 10] [-signal <signalId>] [-csvDir <path>]
+```
+
+`cfg_proc/modules/brokerTech/hdb.json` (port 5077) optionally fronts the
+same archive with the generic `hdb` role for gateway queries. See
+`modules/analytics/brokerTech/README.md` for the data dictionary, sign
+conventions, and per-function detail.
+
+## Economic calendar
+
+`modules/ingest/calendar/` bulk-loads the fxStreet economic-calendar CSVs
+scraped by the sibling `econCalScraper` repo (`<year>/<year>-<month>.csv`,
+2010-2026, ~204k rows: releases, central-bank decisions, bond auctions,
+speeches, market holidays) into its own date-partitioned HDB
+(`C:/data/calendar`, `schema_calendar.q`'s `econCal` table). Unlike
+`schema_retail.q`/`schema_efx.q` (read-only stubs matching an *existing*
+third-party archive - see "Integrating an existing HDB" above), this
+archive is openQ-owned: a stdlib-only Python script
+(`py/to_kdb.py`) rewrites every source row into one `|`-delimited
+staging file and a schema-driven loader (`q/load_calendar.q`, same
+convention as `modules/ingest/yfinance/q/load_yfinance.q`) writes/
+overwrites date partitions - idempotent per source month, so re-running
+after `econCalScraper` produces a fresh month just rewrites those dates.
+
+```
+python modules/ingest/calendar/py/to_kdb.py                     # whole archive
+python modules/ingest/calendar/py/to_kdb.py --glob "2026/*.csv"  # one year
+```
+
+`cfg_proc/modules/calendar/hdb.json` (port 5078) fronts the archive with
+the generic `hdb` role for gateway/qcon queries. Every event keeps
+fxStreet's own `eventId` (guid) release over release, so a single
+recurring event's own time series is keyed on `eventId`, not the
+`event` headline text alone - see `modules/ingest/calendar/README.md`.
 
 ## Monitoring & logging
 

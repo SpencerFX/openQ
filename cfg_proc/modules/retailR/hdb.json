@@ -1,0 +1,24 @@
+{
+  "procType": "hdb",
+  "name": "retailR_hdb",
+  "port": 5079,
+  "schema": "../schemas/schema_retailR.q",
+  "utilities": [
+    "utils/timer.q",
+    "utils/handlers.q",
+    "utils/conn.q",
+    "utils/ipc.q",
+    "utils/servers.q",
+    "utils/perm.q"
+  ],
+  "libraries": [
+    "hdb.q",
+    "utils/gateway.q",
+    "query.q",
+    "../modules/analytics/brokerTech/brokerTech.q",
+    "../modules/analytics/brokerTech/brokerTechSourceR.q"
+  ],
+  "params": {
+    "hdbroot": "C:/data/r"
+  }
+}

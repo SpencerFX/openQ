@@ -535,17 +535,32 @@
 //@param  | now | timestamp
 //@desc
 // Periodic maintenance (call off a timer): expires stale locates/
-// reservations, raises a buy-in per borrow expired since last sweep,
-// prunes alerts older than a day.
+// reservations, raises a buy-in for each borrow that's expired and not
+// yet escalated, prunes alerts older than a day.
+//
+// `not escalated` is a deliberate idempotency check, not an optional
+// filter: without it, an expired borrow that's never removed from
+// .prime.borrows matches `expiry<=now` again on every future tick,
+// re-raising a fresh CRITICAL/BUYIN alert forever - live-verified against
+// a long-running CEP as a real duplicate-alert storm (1,368 .prime.buyins
+// rows from just 114 expired borrows, one client/sym pair alone
+// accounting for 98). This is a single-threaded q process, so there's no
+// actual re-entrancy risk (.prime.sweep can't overlap with itself); the
+// gap this closes is idempotency across separate, sequential ticks - each
+// one completes fully before the next runs, and each one used to
+// independently rediscover the same still-unmarked row. Marking
+// escalated:1b right after raising the buy-in is what makes escalation a
+// once-per-borrow event instead of a once-per-tick one.
 //@desc
 .prime.sweep:{[now]
   .prime.expireLocates now;
-  expired:select from .prime.borrows where expiry<=now;
+  expired:select from .prime.borrows where expiry<=now, not escalated;
   if[count expired;
     / nested lambda can't see .prime.sweep's `now` local - passed in explicitly
     {[now;r]
       .prime.raiseBuyin[r[`client];r[`sym];r[`qty];
         now+.prime.cfg[`buyinGrace];`BORROW_EXPIRED]
-     }[now] each 0!expired];
+     }[now] each 0!expired;
+    update escalated:1b from `.prime.borrows where borrowID in expired[`borrowID]];
   delete from `.prime.alerts where (now-timestamp)>1D;
   };

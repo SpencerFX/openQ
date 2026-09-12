@@ -27,9 +27,15 @@
 .prime.positions:([] timestamp:`timestamp$(); client:`symbol$();
   sym:`symbol$(); qty:`long$(); avgPx:`float$());
 
-// realized borrows against a client's short position
-.prime.borrows:([] timestamp:`timestamp$(); client:`symbol$(); sym:`symbol$();
-  lender:`symbol$(); qty:`long$(); feeBp:`float$(); expiry:`timestamp$());
+// realized borrows against a client's short position. borrowID is assigned
+// by .primeMod.onBorrow on receipt (the wire `borrow` table carries no id
+// of its own - see cep.q). escalated tracks whether .prime.sweep has
+// already raised a buy-in for this row past its expiry, so a borrow that
+// sits unresolved doesn't get re-escalated on every future sweep tick -
+// see .prime.sweep's own header for why this matters.
+.prime.borrows:([] timestamp:`timestamp$(); borrowID:`long$(); client:`symbol$();
+  sym:`symbol$(); lender:`symbol$(); qty:`long$(); feeBp:`float$();
+  expiry:`timestamp$(); escalated:`boolean$());
 
 // lender-initiated recalls of previously-reserved inventory
 .prime.recalls:([] timestamp:`timestamp$(); lender:`symbol$(); sym:`symbol$();
