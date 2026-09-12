@@ -33,8 +33,17 @@ show .prime.positionCoverage[p;.prime.locates;now];
 show .prime.alerts;
 
 -1 "simulating expired borrow...";
-.prime.borrows:([]timestamp:enlist now;client:enlist`ALPHA;sym:enlist`TSLA;
-  lender:enlist`PB;qty:enlist 20000;feeBp:enlist 150f;expiry:enlist now-0D00:01:00);
+.prime.borrows:([]timestamp:enlist now;borrowID:enlist 1j;client:enlist`ALPHA;
+  sym:enlist`TSLA;lender:enlist`PB;qty:enlist 20000;feeBp:enlist 150f;
+  expiry:enlist now-0D00:01:00;escalated:enlist 0b);
+.prime.sweep now;
+-1 "buy-ins after the first sweep tick:";
+show .prime.buyins;
+
+-1 "";
+-1 "second sweep tick against the SAME still-unresolved borrow - should";
+-1 "NOT raise a duplicate buy-in (escalated:1b from the tick above stops";
+-1 "it - this is the .prime.sweep idempotency fix, demonstrated live):";
 .prime.sweep now;
 show .prime.buyins;
 exit 0;

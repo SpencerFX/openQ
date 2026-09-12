@@ -29,8 +29,12 @@
 //@desc
 .util.gw.genID:{:.util.gw.ID+:1};
 
-//Queue of submitted queries
-.util.gw.queue:([queryID:`u#`long$()] time:`timestamp$(); clientH:`g#`int$(); query:(); serverType:(); join:(); postback:(); timeout:`timespan$(); submitted:`timestamp$(); returned:`timestamp$(); took:`timespan$(); error:`boolean$(); discard:`boolean$());
+//Queue of submitted queries. errType tags how a finished query ended:
+//` for a clean result, `timeout`backend`sizecap`join`disconnect for the
+//five failure sites (see .util.gw.finishQuery callers) - lets a monitor
+//tell a timeout wave (backends stuck) from a backend-error wave (one
+//backend broken) from a join failure without parsing the error string.
+.util.gw.queue:([queryID:`u#`long$()] time:`timestamp$(); clientH:`g#`int$(); query:(); serverType:(); join:(); postback:(); timeout:`timespan$(); submitted:`timestamp$(); returned:`timestamp$(); took:`timespan$(); error:`boolean$(); errType:`symbol$(); discard:`boolean$());
 
 //Per-query dispatch/result slots: queryID -> (clientH; slots keyed table)
 //slots: ([serverType] handle;result;error;data;stack)
@@ -138,7 +142,7 @@
 //@desc
 .util.gw.addQueryTimeout:{[time;clientH;query;serverType;join;postback;timeout]
  prep:.util.gw.prepareQuery[serverType;join;query];
- `.util.gw.queue upsert (.util.gw.genID[];time;clientH;prep`query;prep`serverType;prep`join;postback;timeout;0Np;0Np;0D;0b;0b);
+ `.util.gw.queue upsert (.util.gw.genID[];time;clientH;prep`query;prep`serverType;prep`join;postback;timeout;0Np;0Np;0D;0b;`;0b);
  };
 
 //@func   | .util.gw.removeClient
@@ -152,14 +156,16 @@
  };
 
 //@func   | .util.gw.finishQuery
-//@param  | qid | -7 -7h | Query ID(s)
-//@param  | err | -1     | Did the query error
+//@param  | qid   | -7 -7h | Query ID(s)
+//@param  | err   | -1     | Did the query error
+//@param  | etype | -11    | Error class tag - ` for a clean finish, else
+//                          `timeout`backend`sizecap`join`disconnect
 //@desc
 //Records completion stats and frees the query's result cache
 //@desc
-.util.gw.finishQuery:{[qid;err]
+.util.gw.finishQuery:{[qid;err;etype]
  now:.z.p;
- update error:err,returned:now,took:now-submitted from `.util.gw.queue where queryID in qid;
+ update error:err,errType:etype,returned:now,took:now-submitted from `.util.gw.queue where queryID in qid;
  .util.gw.results:((),qid) _ .util.gw.results;
  };
 
@@ -220,7 +226,7 @@
  if[queryID in key .util.gw.results;.util.gw.sendReply[queryID;`error`data`stack!(srvRes`error;srvRes`data;srvRes`stack)]];
  .util.gw.setState[.z.w;0b];
  .util.gw.runNextQuery[];
- .util.gw.finishQuery[queryID;1b];
+ .util.gw.finishQuery[queryID;1b;$[(10h=type srvRes`data)and srvRes[`data]like"Returned result exceeds maxSize*";`sizecap;`backend]];
  };
 
 //@func   | .util.gw.checkResults
@@ -235,7 +241,7 @@
     res:`error`data`stack!.perm.readOnlyTrp (querydetails[`join];exec data from slots);
     if[res[`error];res[`data]:"Failed to apply join function to result sets: ",res[`data]];
     .util.gw.sendReply[queryID;res];
-    .util.gw.finishQuery[queryID;res[`error]]
+    .util.gw.finishQuery[queryID;res[`error];$[res[`error];`join;`]]
    ];
  };
 
@@ -298,7 +304,7 @@
  qids:(key .util.gw.results) where {[serverh;qid] any exec (handle=serverh)&not result from .util.gw.results[qid;1]}[serverh] each key .util.gw.results;
  if[0<count qids;
     {.util.gw.sendReply[x;`error`data`stack!(1b;"Backend server closed the connection";"")]} each qids;
-    .util.gw.finishQuery[qids;1b];
+    .util.gw.finishQuery[qids;1b;`disconnect];
    ];
  update active:0b from `.util.gw.servers where handle=serverh;
  .util.gw.runNextQuery[];
@@ -312,7 +318,7 @@
  qids:exec queryID from .util.gw.queue where not timeout=0Wn,.z.p>time+timeout,null returned;
  if[count qids;
     {.util.gw.sendReply[x;`error`data`stack!(1b;"Query exceeded specified timeout";"")]} each qids;
-    .util.gw.finishQuery[qids;1b];
+    .util.gw.finishQuery[qids;1b;`timeout];
    ];
  };
 

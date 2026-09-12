@@ -22,7 +22,22 @@ system "l ../modules/analytics/primeFinance/primeFinance.q";
   };
 
 .primeMod.onBorrow:{[t;x]
-  {[row] .prime.borrows,:row} each 0!x;
+  / .prime.borrows carries two columns the wire `borrow` table doesn't
+  / (borrowID, escalated - see state.q's own comment) - assigned here on
+  / receipt, not published by the source, so a bare dict append (`,:row`,
+  / the pattern every other handler above still uses) would fail on the
+  / column-count mismatch. do[] with a manually incremented `i` (not
+  / each{[row]...}) is what makes borrowID unique per row in a multi-row
+  / batch - a nested lambda can't see this function's own locals, only
+  / true globals/params, so `i` couldn't be threaded through an each otherwise.
+  rows:0!x;
+  i:0;
+  do[count rows;
+    row:rows i;
+    borrowID:(`long$.z.p)+i;
+    .prime.borrows,:(row[`timestamp];borrowID;row[`client];row[`sym];
+      row[`lender];row[`qty];row[`feeBp];row[`expiry];0b);
+    i+:1];
   };
 
 .primeMod.onRecall:{[t;x]

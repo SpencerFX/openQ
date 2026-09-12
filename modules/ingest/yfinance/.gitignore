@@ -1,6 +1,7 @@
 .venv/
 hist/
 hist_d1/
+options_data/
 live/
 .stage/
 .stage_*.log
